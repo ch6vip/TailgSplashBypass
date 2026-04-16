@@ -5,14 +5,36 @@
 ## 实现方式
 
 - 入口类：`com.tailg.lsposed.adblock.TailgAdBlockModule`
-- Hook 点：`com.tailg.run.intelligence.model.splash.activity.SplashActivity#setupView()`
-- 行为：拦截 `setupView()`，改为直接调用 `setupViewNo()`，并短路原方法。
+- 多 Hook 兜底：
+  - `SplashActivity#setupView()` -> `setupViewNo()`
+  - `SplashActivity#countDown()` -> `countDownNo()`
+  - `ConfigGetBean#getIsShow()` -> `"0"`
+  - `ConfigGetBean#getHomeResource()/getFootResource()` -> `""`
+  - `ConfigGetBean#getDurationTime()` -> `"0"`
+- 版本检测：运行时记录目标应用 `versionName/versionCode`。
+
+## 可配置开关
+
+模块 App 内置设置页（Launcher 图标），配置保存在 `tailg_adblock`：
+
+- `enable_module`：总开关
+- `hook_setup_view`：启用 `setupView` 重定向
+- `hook_count_down`：启用 `countDown` 重定向
+- `hook_config_bean`：启用 `ConfigGetBean` Hook
+- `force_empty_res`：强制清空开屏资源 URL
+- `force_duration_zero`：强制倒计时为 0
+- `verbose_log`：输出详细日志
 
 ## 构建
 
 1. 用 Android Studio 打开本目录 `lsposed-tailg-adblock`。
 2. 同步 Gradle。
 3. 构建 `app` 模块生成 APK（`debug` 或 `release`）。
+
+仓库已提供 GitHub Actions：
+
+- `.github/workflows/android-build.yml`：push/PR 自动编译 debug+release
+- `.github/workflows/android-release-signed.yml`：手动触发签名 release
 
 ## 启用
 
@@ -25,3 +47,12 @@
 
 - 当前使用 Modern Xposed API（`io.github.libxposed:api:101.0.1`）。
 - `minSdk` 设为 26。
+
+## 签名发布（GitHub）
+
+手动触发 `Android Release (Signed)` 前，请在仓库 Secrets 中配置：
+
+- `SIGNING_KEYSTORE_BASE64`：keystore 文件 base64
+- `SIGNING_STORE_PASSWORD`
+- `SIGNING_KEY_ALIAS`
+- `SIGNING_KEY_PASSWORD`

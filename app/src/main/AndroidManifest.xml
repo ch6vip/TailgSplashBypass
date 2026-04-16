@@ -4,5 +4,15 @@
         android:allowBackup="false"
         android:hasCode="true"
         android:label="Tailg LSPosed AdBlock"
-        android:supportsRtl="false" />
+        android:supportsRtl="false">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="Tailg AdBlock Settings">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
 </manifest>
