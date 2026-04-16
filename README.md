@@ -56,3 +56,17 @@
 - `SIGNING_STORE_PASSWORD`
 - `SIGNING_KEY_ALIAS`
 - `SIGNING_KEY_PASSWORD`
+
+## 自动发布到 Releases（推荐）
+
+仓库已提供 `.github/workflows/android-release-tag.yml`：
+
+- 触发条件：`push` 一个形如 `v*` 的 tag（例如 `v1.0.1`）
+- 行为：自动签名构建 release APK，并上传到 GitHub Releases 对应 tag
+
+发版命令示例：
+
+```bash
+git tag v1.0.1
+git push origin v1.0.1
+```
