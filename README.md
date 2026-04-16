@@ -70,3 +70,8 @@
 git tag v1.0.1
 git push origin v1.0.1
 ```
+
+版本号规则：
+
+- 当在 GitHub Actions 的 tag 构建中（`GITHUB_REF_TYPE=tag`）时，APK 的 `versionName` 自动取 tag 名（例如 `v.0.0.1`）。
+- `versionCode` 会按 tag 中数字解析为 `major*10000 + minor*100 + patch`（例如 `v.0.0.1` -> `1`，`v1.2.3` -> `10203`）。

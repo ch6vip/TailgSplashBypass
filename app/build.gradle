@@ -2,6 +2,35 @@ plugins {
     id "com.android.application"
 }
 
+def defaultVersionName = "1.0.0"
+def defaultVersionCode = 1
+
+def githubRefType = System.getenv("GITHUB_REF_TYPE")
+def githubRefName = System.getenv("GITHUB_REF_NAME")
+def releaseTagName = (githubRefType == "tag" && githubRefName != null && !githubRefName.trim().isEmpty())
+        ? githubRefName.trim()
+        : null
+
+def resolvedVersionName = releaseTagName ?: defaultVersionName
+def resolvedVersionCode = defaultVersionCode
+
+if (releaseTagName != null) {
+    def numberParts = []
+    def matcher = (releaseTagName =~ /\d+/)
+    while (matcher.find()) {
+        numberParts << matcher.group().toInteger()
+    }
+
+    if (!numberParts.isEmpty()) {
+        int major = numberParts[0]
+        int minor = numberParts.size() > 1 ? numberParts[1] : 0
+        int patch = numberParts.size() > 2 ? numberParts[2] : 0
+
+        // versionCode uses MAJOR.MINOR.PATCH -> MMmmpp, capped to valid int range.
+        resolvedVersionCode = Math.max(1, Math.min(2_100_000_000, major * 10_000 + minor * 100 + patch))
+    }
+}
+
 def signingStoreFile = System.getenv("SIGNING_STORE_FILE")
 def signingStorePassword = System.getenv("SIGNING_STORE_PASSWORD")
 def signingKeyAlias = System.getenv("SIGNING_KEY_ALIAS")
@@ -20,8 +49,8 @@ android {
         applicationId "com.tailg.lsposed.adblock"
         minSdk 26
         targetSdk 34
-        versionCode 1
-        versionName "1.0.0"
+        versionCode resolvedVersionCode
+        versionName resolvedVersionName
     }
 
     signingConfigs {
