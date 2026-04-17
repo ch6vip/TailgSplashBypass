@@ -63,19 +63,19 @@ public class TailgAdBlockModule extends XposedModule {
                 config.forceEmptyRes,
                 config.forceDurationZero
         );
-        HookInstallStats stats = new HookInstallStats();
-        stats.markRequested(requestPlan.totalRequestCount());
+        HookInstallReport report = new HookInstallReport();
+        report.markRequested(requestPlan.totalRequestCount());
         try {
             ClassLoader classLoader = param.getClassLoader();
             if (requestPlan.hasSplashHooks()) {
-                installSplashHooks(classLoader, config, stats);
+                installSplashHooks(classLoader, config, report);
             }
             if (requestPlan.hasConfigBeanHooks()) {
-                installConfigBeanHooks(classLoader, config, stats);
+                installConfigBeanHooks(classLoader, config, report);
             }
-            logInstallSummary(stats);
+            logInstallSummary(report);
 
-            if (stats.requested > 0 && stats.installed == 0) {
+            if (report.shouldResetInstalledFlag()) {
                 hooksInstalled.set(false);
             }
         } catch (Throwable t) {
@@ -84,46 +84,46 @@ public class TailgAdBlockModule extends XposedModule {
         }
     }
 
-    private void installSplashHooks(ClassLoader classLoader, ModuleConfig config, HookInstallStats stats) {
-        Class<?> splashClazz = tryLoadClass(classLoader, SPLASH_ACTIVITY, "SplashActivity", stats);
+    private void installSplashHooks(ClassLoader classLoader, ModuleConfig config, HookInstallReport report) {
+        Class<?> splashClazz = tryLoadClass(classLoader, SPLASH_ACTIVITY, "SplashActivity", report);
         if (splashClazz == null) {
             return;
         }
 
         if (config.hookSetupView) {
-            installVoidRedirectHook(splashClazz, "setupView", "setupViewNo", config.verboseLog, stats);
+            installVoidRedirectHook(splashClazz, "setupView", "setupViewNo", config.verboseLog, report);
         }
         if (config.hookCountDown) {
-            installVoidRedirectHook(splashClazz, "countDown", "countDownNo", config.verboseLog, stats);
+            installVoidRedirectHook(splashClazz, "countDown", "countDownNo", config.verboseLog, report);
         }
     }
 
-    private void installConfigBeanHooks(ClassLoader classLoader, ModuleConfig config, HookInstallStats stats) {
-        Class<?> beanClazz = tryLoadClass(classLoader, CONFIG_GET_BEAN, "ConfigGetBean", stats);
+    private void installConfigBeanHooks(ClassLoader classLoader, ModuleConfig config, HookInstallReport report) {
+        Class<?> beanClazz = tryLoadClass(classLoader, CONFIG_GET_BEAN, "ConfigGetBean", report);
         if (beanClazz == null) {
             return;
         }
 
-        hookStringMethod(beanClazz, "getIsShow", "0", config.verboseLog, stats);
+        hookStringMethod(beanClazz, "getIsShow", "0", config.verboseLog, report);
 
         if (config.forceEmptyRes) {
-            hookStringMethod(beanClazz, "getHomeResource", "", config.verboseLog, stats);
-            hookStringMethod(beanClazz, "getFootResource", "", config.verboseLog, stats);
+            hookStringMethod(beanClazz, "getHomeResource", "", config.verboseLog, report);
+            hookStringMethod(beanClazz, "getFootResource", "", config.verboseLog, report);
         }
         if (config.forceDurationZero) {
-            hookStringMethod(beanClazz, "getDurationTime", "0", config.verboseLog, stats);
+            hookStringMethod(beanClazz, "getDurationTime", "0", config.verboseLog, report);
         }
     }
 
-    private Class<?> tryLoadClass(ClassLoader classLoader, String className, String alias, HookInstallStats stats) {
+    private Class<?> tryLoadClass(ClassLoader classLoader, String className, String alias, HookInstallReport report) {
         try {
             return Class.forName(className, false, classLoader);
         } catch (ClassNotFoundException e) {
-            stats.markFailed();
+            report.markFailed();
             log(Log.WARN, TAG, "Class missing: " + alias + " (" + className + ")");
             return null;
         } catch (Throwable t) {
-            stats.markFailed();
+            report.markFailed();
             log(Log.ERROR, TAG, "Load class failed: " + alias + " (" + className + ")", t);
             return null;
         }
@@ -134,16 +134,16 @@ public class TailgAdBlockModule extends XposedModule {
             String sourceMethodName,
             String targetMethodName,
             boolean verboseLog,
-            HookInstallStats stats
+            HookInstallReport report
     ) {
         Method sourceMethod = findNoArgMethod(targetClazz, sourceMethodName);
         Method targetMethod = findNoArgMethod(targetClazz, targetMethodName);
         if (sourceMethod == null || targetMethod == null) {
-            stats.markSkipped();
+            report.markSkipped();
             return;
         }
         if (sourceMethod.getReturnType() != Void.TYPE || targetMethod.getReturnType() != Void.TYPE) {
-            stats.markSkipped();
+            report.markSkipped();
             log(Log.WARN, TAG, "Incompatible method signature: " + sourceMethodName + " / " + targetMethodName);
             return;
         }
@@ -158,12 +158,12 @@ public class TailgAdBlockModule extends XposedModule {
                 }
                 return null;
             });
-            stats.markInstalled();
+            report.markInstalled();
             if (verboseLog) {
                 log(Log.INFO, TAG, "Hooked " + sourceMethodName + " -> " + targetMethodName);
             }
         } catch (Throwable t) {
-            stats.markFailed();
+            report.markFailed();
             log(Log.ERROR, TAG, "Install redirect hook failed: " + sourceMethodName + " -> " + targetMethodName, t);
         }
     }
@@ -173,27 +173,27 @@ public class TailgAdBlockModule extends XposedModule {
             String methodName,
             String replacementValue,
             boolean verboseLog,
-            HookInstallStats stats
+            HookInstallReport report
     ) {
         Method method = findNoArgMethod(targetClazz, methodName);
         if (method == null) {
-            stats.markSkipped();
+            report.markSkipped();
             return;
         }
         if (method.getReturnType() != String.class) {
-            stats.markSkipped();
+            report.markSkipped();
             log(Log.WARN, TAG, "Incompatible return type: " + targetClazz.getSimpleName() + "#" + methodName);
             return;
         }
 
         try {
             hook(method).setPriority(PRIORITY_HIGHEST).intercept(chain -> replacementValue);
-            stats.markInstalled();
+            report.markInstalled();
             if (verboseLog) {
                 log(Log.INFO, TAG, "Hooked " + targetClazz.getSimpleName() + "#" + methodName + " => \"" + replacementValue + "\"");
             }
         } catch (Throwable t) {
-            stats.markFailed();
+            report.markFailed();
             log(Log.ERROR, TAG, "Install string hook failed: " + targetClazz.getSimpleName() + "#" + methodName, t);
         }
     }
@@ -210,12 +210,9 @@ public class TailgAdBlockModule extends XposedModule {
         }
     }
 
-    private void logInstallSummary(HookInstallStats stats) {
-        String summary = "Hook summary requested=" + stats.requested
-                + " installed=" + stats.installed
-                + " skipped=" + stats.skipped
-                + " failed=" + stats.failed;
-        if (stats.failed > 0 && stats.installed == 0) {
+    private void logInstallSummary(HookInstallReport report) {
+        String summary = report.summaryMessage();
+        if (report.shouldWarnSummary()) {
             log(Log.WARN, TAG, summary);
             return;
         }
@@ -287,29 +284,6 @@ public class TailgAdBlockModule extends XposedModule {
         } catch (Throwable t) {
             log(Log.WARN, TAG, "Resolve versionCode via reflection failed", t);
             return -1L;
-        }
-    }
-
-    private static final class HookInstallStats {
-        int requested;
-        int installed;
-        int skipped;
-        int failed;
-
-        void markRequested(int count) {
-            requested += count;
-        }
-
-        void markInstalled() {
-            installed++;
-        }
-
-        void markSkipped() {
-            skipped++;
-        }
-
-        void markFailed() {
-            failed++;
         }
     }
 
