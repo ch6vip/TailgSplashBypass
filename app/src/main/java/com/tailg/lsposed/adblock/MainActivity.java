@@ -15,6 +15,7 @@ import android.widget.Toast;
 public class MainActivity extends Activity {
     private SharedPreferences prefs;
     private Switch enableModuleSwitch;
+    private Switch strictVersionGuardSwitch;
     private Switch setupViewSwitch;
     private Switch countDownSwitch;
     private Switch configBeanSwitch;
@@ -47,6 +48,11 @@ public class MainActivity extends Activity {
         container.addView(tip);
 
         enableModuleSwitch = createSwitch(R.string.switch_enable_module, ConfigKeys.DEFAULT_ENABLE_MODULE, container);
+        strictVersionGuardSwitch = createSwitch(
+                R.string.switch_strict_version_guard,
+                ConfigKeys.DEFAULT_STRICT_VERSION_GUARD,
+                container
+        );
         setupViewSwitch = createSwitch(R.string.switch_hook_setup_view, ConfigKeys.DEFAULT_HOOK_SETUP_VIEW, container);
         countDownSwitch = createSwitch(R.string.switch_hook_count_down, ConfigKeys.DEFAULT_HOOK_COUNT_DOWN, container);
         configBeanSwitch = createSwitch(R.string.switch_hook_config_bean, ConfigKeys.DEFAULT_HOOK_CONFIG_BEAN, container);
@@ -71,6 +77,10 @@ public class MainActivity extends Activity {
 
     private void bindInitialValues() {
         enableModuleSwitch.setChecked(prefs.getBoolean(ConfigKeys.KEY_ENABLE_MODULE, ConfigKeys.DEFAULT_ENABLE_MODULE));
+        strictVersionGuardSwitch.setChecked(prefs.getBoolean(
+                ConfigKeys.KEY_STRICT_VERSION_GUARD,
+                ConfigKeys.DEFAULT_STRICT_VERSION_GUARD
+        ));
         setupViewSwitch.setChecked(prefs.getBoolean(ConfigKeys.KEY_HOOK_SETUP_VIEW, ConfigKeys.DEFAULT_HOOK_SETUP_VIEW));
         countDownSwitch.setChecked(prefs.getBoolean(ConfigKeys.KEY_HOOK_COUNT_DOWN, ConfigKeys.DEFAULT_HOOK_COUNT_DOWN));
         configBeanSwitch.setChecked(prefs.getBoolean(ConfigKeys.KEY_HOOK_CONFIG_BEAN, ConfigKeys.DEFAULT_HOOK_CONFIG_BEAN));
@@ -82,6 +92,7 @@ public class MainActivity extends Activity {
     private void saveConfig() {
         prefs.edit()
                 .putBoolean(ConfigKeys.KEY_ENABLE_MODULE, enableModuleSwitch.isChecked())
+                .putBoolean(ConfigKeys.KEY_STRICT_VERSION_GUARD, strictVersionGuardSwitch.isChecked())
                 .putBoolean(ConfigKeys.KEY_HOOK_SETUP_VIEW, setupViewSwitch.isChecked())
                 .putBoolean(ConfigKeys.KEY_HOOK_COUNT_DOWN, countDownSwitch.isChecked())
                 .putBoolean(ConfigKeys.KEY_HOOK_CONFIG_BEAN, configBeanSwitch.isChecked())

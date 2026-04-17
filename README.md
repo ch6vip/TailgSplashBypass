@@ -12,18 +12,22 @@
   - `ConfigGetBean#getHomeResource()/getFootResource()` -> `""`
   - `ConfigGetBean#getDurationTime()` -> `"0"`
 - 版本检测：运行时记录目标应用 `versionName/versionCode`。
+- 安全策略：
+  - 方法签名/返回类型不匹配时自动跳过对应 Hook，不中断其他 Hook
+  - 支持按版本前缀白名单校验（可通过配置切换严格模式）
 
 ## 可配置开关
 
 模块 App 内置设置页（Launcher 图标），配置保存在 `tailg_adblock`：
 
 - `enable_module`：总开关
+- `strict_version_guard`：仅在受支持版本启用 Hook（默认开启）
 - `hook_setup_view`：启用 `setupView` 重定向
 - `hook_count_down`：启用 `countDown` 重定向
 - `hook_config_bean`：启用 `ConfigGetBean` Hook
 - `force_empty_res`：强制清空开屏资源 URL
 - `force_duration_zero`：强制倒计时为 0
-- `verbose_log`：输出详细日志
+- `verbose_log`：输出详细日志（默认关闭）
 
 ## 构建
 

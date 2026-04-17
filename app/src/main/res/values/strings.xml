@@ -4,6 +4,7 @@
     <string name="settings_title">Tailg AdBlock Settings</string>
     <string name="settings_tip_restart">修改后需要在 LSPosed 中重启目标应用（必要时重启系统）。</string>
     <string name="switch_enable_module">启用模块</string>
+    <string name="switch_strict_version_guard">仅在受支持版本启用Hook</string>
     <string name="switch_hook_setup_view">Hook setupView -&gt; setupViewNo</string>
     <string name="switch_hook_count_down">Hook countDown -&gt; countDownNo</string>
     <string name="switch_hook_config_bean">Hook ConfigGetBean 字段</string>

@@ -3,6 +3,7 @@ package com.tailg.lsposed.adblock;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.util.Log;
 
@@ -18,8 +19,6 @@ public class TailgAdBlockModule extends XposedModule {
             "com.tailg.run.intelligence.model.splash.activity.SplashActivity";
     private static final String CONFIG_GET_BEAN =
             "com.tailg.run.intelligence.model.home.bean.ConfigGetBean";
-
-    private static final String EXPECTED_VERSION_PREFIX = "3.5";
 
     private final AtomicBoolean hooksInstalled = new AtomicBoolean(false);
 
@@ -40,24 +39,44 @@ public class TailgAdBlockModule extends XposedModule {
         }
 
         VersionInfo versionInfo = detectVersionInfo();
+        boolean versionSupported = VersionGuardPolicy.isSupported(versionInfo.versionName);
+        boolean shouldInstallHooks = VersionGuardPolicy.shouldInstallHooks(
+                versionInfo.versionName,
+                config.strictVersionGuard
+        );
         if (config.verboseLog) {
             log(Log.INFO, TAG, "Target version=" + versionInfo.versionName + " (" + versionInfo.versionCode + ")");
         }
-        if (!versionInfo.versionName.startsWith(EXPECTED_VERSION_PREFIX)) {
-            log(Log.WARN, TAG, "Unexpected target version: " + versionInfo.versionName);
+        if (!versionSupported) {
+            log(Log.WARN, TAG, "Unsupported target version: " + versionInfo.versionName);
+            if (!shouldInstallHooks) {
+                log(Log.WARN, TAG, "strict_version_guard enabled, skip installing hooks.");
+                hooksInstalled.set(false);
+                return;
+            }
         }
 
+        HookRequestPlan requestPlan = HookRequestPlan.fromConfig(
+                config.hookSetupView,
+                config.hookCountDown,
+                config.hookConfigBean,
+                config.forceEmptyRes,
+                config.forceDurationZero
+        );
+        HookInstallStats stats = new HookInstallStats();
+        stats.markRequested(requestPlan.totalRequestCount());
         try {
             ClassLoader classLoader = param.getClassLoader();
-            if (config.hookSetupView || config.hookCountDown) {
-                installSplashHooks(classLoader, config);
+            if (requestPlan.hasSplashHooks()) {
+                installSplashHooks(classLoader, config, stats);
             }
-            if (config.hookConfigBean) {
-                installConfigBeanHooks(classLoader, config);
+            if (requestPlan.hasConfigBeanHooks()) {
+                installConfigBeanHooks(classLoader, config, stats);
             }
+            logInstallSummary(stats);
 
-            if (config.verboseLog) {
-                log(Log.INFO, TAG, "Hooks installed for " + TARGET_PACKAGE);
+            if (stats.requested > 0 && stats.installed == 0) {
+                hooksInstalled.set(false);
             }
         } catch (Throwable t) {
             hooksInstalled.set(false);
@@ -65,26 +84,48 @@ public class TailgAdBlockModule extends XposedModule {
         }
     }
 
-    private void installSplashHooks(ClassLoader classLoader, ModuleConfig config) throws ClassNotFoundException {
-        Class<?> splashClazz = Class.forName(SPLASH_ACTIVITY, false, classLoader);
+    private void installSplashHooks(ClassLoader classLoader, ModuleConfig config, HookInstallStats stats) {
+        Class<?> splashClazz = tryLoadClass(classLoader, SPLASH_ACTIVITY, "SplashActivity", stats);
+        if (splashClazz == null) {
+            return;
+        }
+
         if (config.hookSetupView) {
-            installVoidRedirectHook(splashClazz, "setupView", "setupViewNo", config.verboseLog);
+            installVoidRedirectHook(splashClazz, "setupView", "setupViewNo", config.verboseLog, stats);
         }
         if (config.hookCountDown) {
-            installVoidRedirectHook(splashClazz, "countDown", "countDownNo", config.verboseLog);
+            installVoidRedirectHook(splashClazz, "countDown", "countDownNo", config.verboseLog, stats);
         }
     }
 
-    private void installConfigBeanHooks(ClassLoader classLoader, ModuleConfig config) throws ClassNotFoundException {
-        Class<?> beanClazz = Class.forName(CONFIG_GET_BEAN, false, classLoader);
+    private void installConfigBeanHooks(ClassLoader classLoader, ModuleConfig config, HookInstallStats stats) {
+        Class<?> beanClazz = tryLoadClass(classLoader, CONFIG_GET_BEAN, "ConfigGetBean", stats);
+        if (beanClazz == null) {
+            return;
+        }
 
-        hookStringMethod(beanClazz, "getIsShow", "0", config.verboseLog);
+        hookStringMethod(beanClazz, "getIsShow", "0", config.verboseLog, stats);
+
         if (config.forceEmptyRes) {
-            hookStringMethod(beanClazz, "getHomeResource", "", config.verboseLog);
-            hookStringMethod(beanClazz, "getFootResource", "", config.verboseLog);
+            hookStringMethod(beanClazz, "getHomeResource", "", config.verboseLog, stats);
+            hookStringMethod(beanClazz, "getFootResource", "", config.verboseLog, stats);
         }
         if (config.forceDurationZero) {
-            hookStringMethod(beanClazz, "getDurationTime", "0", config.verboseLog);
+            hookStringMethod(beanClazz, "getDurationTime", "0", config.verboseLog, stats);
+        }
+    }
+
+    private Class<?> tryLoadClass(ClassLoader classLoader, String className, String alias, HookInstallStats stats) {
+        try {
+            return Class.forName(className, false, classLoader);
+        } catch (ClassNotFoundException e) {
+            stats.markFailed();
+            log(Log.WARN, TAG, "Class missing: " + alias + " (" + className + ")");
+            return null;
+        } catch (Throwable t) {
+            stats.markFailed();
+            log(Log.ERROR, TAG, "Load class failed: " + alias + " (" + className + ")", t);
+            return null;
         }
     }
 
@@ -92,13 +133,23 @@ public class TailgAdBlockModule extends XposedModule {
             Class<?> targetClazz,
             String sourceMethodName,
             String targetMethodName,
-            boolean verboseLog
+            boolean verboseLog,
+            HookInstallStats stats
     ) {
-        try {
-            Method sourceMethod = targetClazz.getDeclaredMethod(sourceMethodName);
-            Method targetMethod = targetClazz.getDeclaredMethod(targetMethodName);
-            targetMethod.setAccessible(true);
+        Method sourceMethod = findNoArgMethod(targetClazz, sourceMethodName);
+        Method targetMethod = findNoArgMethod(targetClazz, targetMethodName);
+        if (sourceMethod == null || targetMethod == null) {
+            stats.markSkipped();
+            return;
+        }
+        if (sourceMethod.getReturnType() != Void.TYPE || targetMethod.getReturnType() != Void.TYPE) {
+            stats.markSkipped();
+            log(Log.WARN, TAG, "Incompatible method signature: " + sourceMethodName + " / " + targetMethodName);
+            return;
+        }
 
+        try {
+            targetMethod.setAccessible(true);
             hook(sourceMethod).setPriority(PRIORITY_HIGHEST).intercept(chain -> {
                 try {
                     targetMethod.invoke(chain.getThisObject());
@@ -107,11 +158,13 @@ public class TailgAdBlockModule extends XposedModule {
                 }
                 return null;
             });
+            stats.markInstalled();
             if (verboseLog) {
                 log(Log.INFO, TAG, "Hooked " + sourceMethodName + " -> " + targetMethodName);
             }
-        } catch (NoSuchMethodException e) {
-            log(Log.WARN, TAG, "Method missing: " + sourceMethodName + "/" + targetMethodName);
+        } catch (Throwable t) {
+            stats.markFailed();
+            log(Log.ERROR, TAG, "Install redirect hook failed: " + sourceMethodName + " -> " + targetMethodName, t);
         }
     }
 
@@ -119,17 +172,54 @@ public class TailgAdBlockModule extends XposedModule {
             Class<?> targetClazz,
             String methodName,
             String replacementValue,
-            boolean verboseLog
+            boolean verboseLog,
+            HookInstallStats stats
     ) {
+        Method method = findNoArgMethod(targetClazz, methodName);
+        if (method == null) {
+            stats.markSkipped();
+            return;
+        }
+        if (method.getReturnType() != String.class) {
+            stats.markSkipped();
+            log(Log.WARN, TAG, "Incompatible return type: " + targetClazz.getSimpleName() + "#" + methodName);
+            return;
+        }
+
         try {
-            Method method = targetClazz.getDeclaredMethod(methodName);
             hook(method).setPriority(PRIORITY_HIGHEST).intercept(chain -> replacementValue);
+            stats.markInstalled();
             if (verboseLog) {
                 log(Log.INFO, TAG, "Hooked " + targetClazz.getSimpleName() + "#" + methodName + " => \"" + replacementValue + "\"");
             }
+        } catch (Throwable t) {
+            stats.markFailed();
+            log(Log.ERROR, TAG, "Install string hook failed: " + targetClazz.getSimpleName() + "#" + methodName, t);
+        }
+    }
+
+    private Method findNoArgMethod(Class<?> targetClazz, String methodName) {
+        try {
+            return targetClazz.getDeclaredMethod(methodName);
         } catch (NoSuchMethodException e) {
             log(Log.WARN, TAG, "Method missing: " + targetClazz.getSimpleName() + "#" + methodName);
+            return null;
+        } catch (Throwable t) {
+            log(Log.ERROR, TAG, "Resolve method failed: " + targetClazz.getSimpleName() + "#" + methodName, t);
+            return null;
         }
+    }
+
+    private void logInstallSummary(HookInstallStats stats) {
+        String summary = "Hook summary requested=" + stats.requested
+                + " installed=" + stats.installed
+                + " skipped=" + stats.skipped
+                + " failed=" + stats.failed;
+        if (stats.failed > 0 && stats.installed == 0) {
+            log(Log.WARN, TAG, summary);
+            return;
+        }
+        log(Log.INFO, TAG, summary);
     }
 
     private ModuleConfig readConfig() {
@@ -147,6 +237,7 @@ public class TailgAdBlockModule extends XposedModule {
 
         return new ModuleConfig(
                 prefs.getBoolean(ConfigKeys.KEY_ENABLE_MODULE, defaults.enableModule),
+                prefs.getBoolean(ConfigKeys.KEY_STRICT_VERSION_GUARD, defaults.strictVersionGuard),
                 prefs.getBoolean(ConfigKeys.KEY_HOOK_SETUP_VIEW, defaults.hookSetupView),
                 prefs.getBoolean(ConfigKeys.KEY_HOOK_COUNT_DOWN, defaults.hookCountDown),
                 prefs.getBoolean(ConfigKeys.KEY_HOOK_CONFIG_BEAN, defaults.hookConfigBean),
@@ -161,13 +252,17 @@ public class TailgAdBlockModule extends XposedModule {
             Class<?> activityThread = Class.forName("android.app.ActivityThread");
             Object app = activityThread.getMethod("currentApplication").invoke(null);
             if (app instanceof Context context) {
-                PackageInfo packageInfo = context.getPackageManager().getPackageInfo(TARGET_PACKAGE, 0);
-                long versionCode;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    versionCode = packageInfo.getLongVersionCode();
+                PackageManager packageManager = context.getPackageManager();
+                PackageInfo packageInfo;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    packageInfo = packageManager.getPackageInfo(
+                            TARGET_PACKAGE,
+                            PackageManager.PackageInfoFlags.of(0L)
+                    );
                 } else {
-                    versionCode = packageInfo.versionCode;
+                    packageInfo = packageManager.getPackageInfo(TARGET_PACKAGE, 0);
                 }
+                long versionCode = resolveVersionCode(packageInfo);
                 String versionName = packageInfo.versionName == null ? "unknown" : packageInfo.versionName;
                 return new VersionInfo(versionName, versionCode);
             }
@@ -177,8 +272,50 @@ public class TailgAdBlockModule extends XposedModule {
         return new VersionInfo("unknown", -1L);
     }
 
+    private long resolveVersionCode(PackageInfo packageInfo) {
+        try {
+            Method getLongVersionCode = PackageInfo.class.getMethod("getLongVersionCode");
+            Object value = getLongVersionCode.invoke(packageInfo);
+            if (value instanceof Long) {
+                return (Long) value;
+            }
+        } catch (Throwable ignore) {
+            // fallback below
+        }
+        try {
+            return PackageInfo.class.getField("versionCode").getInt(packageInfo);
+        } catch (Throwable t) {
+            log(Log.WARN, TAG, "Resolve versionCode via reflection failed", t);
+            return -1L;
+        }
+    }
+
+    private static final class HookInstallStats {
+        int requested;
+        int installed;
+        int skipped;
+        int failed;
+
+        void markRequested(int count) {
+            requested += count;
+        }
+
+        void markInstalled() {
+            installed++;
+        }
+
+        void markSkipped() {
+            skipped++;
+        }
+
+        void markFailed() {
+            failed++;
+        }
+    }
+
     private static final class ModuleConfig {
         final boolean enableModule;
+        final boolean strictVersionGuard;
         final boolean hookSetupView;
         final boolean hookCountDown;
         final boolean hookConfigBean;
@@ -188,6 +325,7 @@ public class TailgAdBlockModule extends XposedModule {
 
         ModuleConfig(
                 boolean enableModule,
+                boolean strictVersionGuard,
                 boolean hookSetupView,
                 boolean hookCountDown,
                 boolean hookConfigBean,
@@ -196,6 +334,7 @@ public class TailgAdBlockModule extends XposedModule {
                 boolean verboseLog
         ) {
             this.enableModule = enableModule;
+            this.strictVersionGuard = strictVersionGuard;
             this.hookSetupView = hookSetupView;
             this.hookCountDown = hookCountDown;
             this.hookConfigBean = hookConfigBean;
@@ -207,6 +346,7 @@ public class TailgAdBlockModule extends XposedModule {
         static ModuleConfig defaults() {
             return new ModuleConfig(
                     ConfigKeys.DEFAULT_ENABLE_MODULE,
+                    ConfigKeys.DEFAULT_STRICT_VERSION_GUARD,
                     ConfigKeys.DEFAULT_HOOK_SETUP_VIEW,
                     ConfigKeys.DEFAULT_HOOK_COUNT_DOWN,
                     ConfigKeys.DEFAULT_HOOK_CONFIG_BEAN,
