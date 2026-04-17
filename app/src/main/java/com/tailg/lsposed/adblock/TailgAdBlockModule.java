@@ -7,6 +7,7 @@ import android.os.Build;
 import android.util.Log;
 
 import java.lang.reflect.Method;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.github.libxposed.api.XposedModule;
 
@@ -18,30 +19,23 @@ public class TailgAdBlockModule extends XposedModule {
     private static final String CONFIG_GET_BEAN =
             "com.tailg.run.intelligence.model.home.bean.ConfigGetBean";
 
-    private static final String PREFS_NAME = "tailg_adblock";
-    private static final String KEY_ENABLE_MODULE = "enable_module";
-    private static final String KEY_HOOK_SETUP_VIEW = "hook_setup_view";
-    private static final String KEY_HOOK_COUNT_DOWN = "hook_count_down";
-    private static final String KEY_HOOK_CONFIG_BEAN = "hook_config_bean";
-    private static final String KEY_FORCE_EMPTY_RES = "force_empty_res";
-    private static final String KEY_FORCE_DURATION_ZERO = "force_duration_zero";
-    private static final String KEY_VERBOSE_LOG = "verbose_log";
     private static final String EXPECTED_VERSION_PREFIX = "3.5";
 
-    private volatile boolean hooksInstalled;
+    private final AtomicBoolean hooksInstalled = new AtomicBoolean(false);
 
     @Override
     public void onPackageReady(PackageReadyParam param) {
         if (!TARGET_PACKAGE.equals(param.getPackageName())) {
             return;
         }
-        if (hooksInstalled) {
+        if (!hooksInstalled.compareAndSet(false, true)) {
             return;
         }
 
         ModuleConfig config = readConfig();
         if (!config.enableModule) {
             log(Log.INFO, TAG, "Module disabled by config.");
+            hooksInstalled.set(false);
             return;
         }
 
@@ -62,9 +56,11 @@ public class TailgAdBlockModule extends XposedModule {
                 installConfigBeanHooks(classLoader, config);
             }
 
-            hooksInstalled = true;
-            log(Log.INFO, TAG, "Hooks installed for " + TARGET_PACKAGE);
+            if (config.verboseLog) {
+                log(Log.INFO, TAG, "Hooks installed for " + TARGET_PACKAGE);
+            }
         } catch (Throwable t) {
+            hooksInstalled.set(false);
             log(Log.ERROR, TAG, "Install hooks failed", t);
         }
     }
@@ -72,27 +68,32 @@ public class TailgAdBlockModule extends XposedModule {
     private void installSplashHooks(ClassLoader classLoader, ModuleConfig config) throws ClassNotFoundException {
         Class<?> splashClazz = Class.forName(SPLASH_ACTIVITY, false, classLoader);
         if (config.hookSetupView) {
-            installVoidRedirectHook(splashClazz, "setupView", "setupViewNo");
+            installVoidRedirectHook(splashClazz, "setupView", "setupViewNo", config.verboseLog);
         }
         if (config.hookCountDown) {
-            installVoidRedirectHook(splashClazz, "countDown", "countDownNo");
+            installVoidRedirectHook(splashClazz, "countDown", "countDownNo", config.verboseLog);
         }
     }
 
     private void installConfigBeanHooks(ClassLoader classLoader, ModuleConfig config) throws ClassNotFoundException {
         Class<?> beanClazz = Class.forName(CONFIG_GET_BEAN, false, classLoader);
 
-        hookStringMethod(beanClazz, "getIsShow", "0");
+        hookStringMethod(beanClazz, "getIsShow", "0", config.verboseLog);
         if (config.forceEmptyRes) {
-            hookStringMethod(beanClazz, "getHomeResource", "");
-            hookStringMethod(beanClazz, "getFootResource", "");
+            hookStringMethod(beanClazz, "getHomeResource", "", config.verboseLog);
+            hookStringMethod(beanClazz, "getFootResource", "", config.verboseLog);
         }
         if (config.forceDurationZero) {
-            hookStringMethod(beanClazz, "getDurationTime", "0");
+            hookStringMethod(beanClazz, "getDurationTime", "0", config.verboseLog);
         }
     }
 
-    private void installVoidRedirectHook(Class<?> targetClazz, String sourceMethodName, String targetMethodName) {
+    private void installVoidRedirectHook(
+            Class<?> targetClazz,
+            String sourceMethodName,
+            String targetMethodName,
+            boolean verboseLog
+    ) {
         try {
             Method sourceMethod = targetClazz.getDeclaredMethod(sourceMethodName);
             Method targetMethod = targetClazz.getDeclaredMethod(targetMethodName);
@@ -106,17 +107,26 @@ public class TailgAdBlockModule extends XposedModule {
                 }
                 return null;
             });
-            log(Log.INFO, TAG, "Hooked " + sourceMethodName + " -> " + targetMethodName);
+            if (verboseLog) {
+                log(Log.INFO, TAG, "Hooked " + sourceMethodName + " -> " + targetMethodName);
+            }
         } catch (NoSuchMethodException e) {
             log(Log.WARN, TAG, "Method missing: " + sourceMethodName + "/" + targetMethodName);
         }
     }
 
-    private void hookStringMethod(Class<?> targetClazz, String methodName, String replacementValue) {
+    private void hookStringMethod(
+            Class<?> targetClazz,
+            String methodName,
+            String replacementValue,
+            boolean verboseLog
+    ) {
         try {
             Method method = targetClazz.getDeclaredMethod(methodName);
             hook(method).setPriority(PRIORITY_HIGHEST).intercept(chain -> replacementValue);
-            log(Log.INFO, TAG, "Hooked " + targetClazz.getSimpleName() + "#" + methodName + " => \"" + replacementValue + "\"");
+            if (verboseLog) {
+                log(Log.INFO, TAG, "Hooked " + targetClazz.getSimpleName() + "#" + methodName + " => \"" + replacementValue + "\"");
+            }
         } catch (NoSuchMethodException e) {
             log(Log.WARN, TAG, "Method missing: " + targetClazz.getSimpleName() + "#" + methodName);
         }
@@ -125,7 +135,7 @@ public class TailgAdBlockModule extends XposedModule {
     private ModuleConfig readConfig() {
         SharedPreferences prefs = null;
         try {
-            prefs = getRemotePreferences(PREFS_NAME);
+            prefs = getRemotePreferences(ConfigKeys.PREFS_NAME);
         } catch (Throwable t) {
             log(Log.WARN, TAG, "Read remote preferences failed, fallback to defaults", t);
         }
@@ -136,13 +146,13 @@ public class TailgAdBlockModule extends XposedModule {
         }
 
         return new ModuleConfig(
-                prefs.getBoolean(KEY_ENABLE_MODULE, defaults.enableModule),
-                prefs.getBoolean(KEY_HOOK_SETUP_VIEW, defaults.hookSetupView),
-                prefs.getBoolean(KEY_HOOK_COUNT_DOWN, defaults.hookCountDown),
-                prefs.getBoolean(KEY_HOOK_CONFIG_BEAN, defaults.hookConfigBean),
-                prefs.getBoolean(KEY_FORCE_EMPTY_RES, defaults.forceEmptyRes),
-                prefs.getBoolean(KEY_FORCE_DURATION_ZERO, defaults.forceDurationZero),
-                prefs.getBoolean(KEY_VERBOSE_LOG, defaults.verboseLog)
+                prefs.getBoolean(ConfigKeys.KEY_ENABLE_MODULE, defaults.enableModule),
+                prefs.getBoolean(ConfigKeys.KEY_HOOK_SETUP_VIEW, defaults.hookSetupView),
+                prefs.getBoolean(ConfigKeys.KEY_HOOK_COUNT_DOWN, defaults.hookCountDown),
+                prefs.getBoolean(ConfigKeys.KEY_HOOK_CONFIG_BEAN, defaults.hookConfigBean),
+                prefs.getBoolean(ConfigKeys.KEY_FORCE_EMPTY_RES, defaults.forceEmptyRes),
+                prefs.getBoolean(ConfigKeys.KEY_FORCE_DURATION_ZERO, defaults.forceDurationZero),
+                prefs.getBoolean(ConfigKeys.KEY_VERBOSE_LOG, defaults.verboseLog)
         );
     }
 
@@ -195,7 +205,15 @@ public class TailgAdBlockModule extends XposedModule {
         }
 
         static ModuleConfig defaults() {
-            return new ModuleConfig(true, true, true, true, true, true, true);
+            return new ModuleConfig(
+                    ConfigKeys.DEFAULT_ENABLE_MODULE,
+                    ConfigKeys.DEFAULT_HOOK_SETUP_VIEW,
+                    ConfigKeys.DEFAULT_HOOK_COUNT_DOWN,
+                    ConfigKeys.DEFAULT_HOOK_CONFIG_BEAN,
+                    ConfigKeys.DEFAULT_FORCE_EMPTY_RES,
+                    ConfigKeys.DEFAULT_FORCE_DURATION_ZERO,
+                    ConfigKeys.DEFAULT_VERBOSE_LOG
+            );
         }
     }
 

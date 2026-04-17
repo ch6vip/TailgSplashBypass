@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Tailg LSPosed AdBlock</string>
+    <string name="settings_title">Tailg AdBlock Settings</string>
+    <string name="settings_tip_restart">修改后需要在 LSPosed 中重启目标应用（必要时重启系统）。</string>
+    <string name="switch_enable_module">启用模块</string>
+    <string name="switch_hook_setup_view">Hook setupView -&gt; setupViewNo</string>
+    <string name="switch_hook_count_down">Hook countDown -&gt; countDownNo</string>
+    <string name="switch_hook_config_bean">Hook ConfigGetBean 字段</string>
+    <string name="switch_force_empty_res">强制清空开屏资源URL</string>
+    <string name="switch_force_duration_zero">强制倒计时为0</string>
+    <string name="switch_verbose_log">输出详细日志</string>
+    <string name="save_button_text">保存配置</string>
+    <string name="settings_saved_toast">已保存，重启目标应用后生效</string>
+</resources>

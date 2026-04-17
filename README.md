@@ -31,6 +31,13 @@
 2. 同步 Gradle。
 3. 构建 `app` 模块生成 APK（`debug` 或 `release`）。
 
+命令行构建（使用 Gradle Wrapper）：
+
+```bash
+./gradlew :app:assembleDebug
+./gradlew :app:assembleRelease
+```
+
 仓库已提供 GitHub Actions：
 
 - `.github/workflows/android-build.yml`：push/PR 自动编译 debug+release
@@ -62,7 +69,7 @@
 仓库已提供 `.github/workflows/android-release-tag.yml`：
 
 - 触发条件：`push` 一个形如 `versionCode-versionName` 的 tag（例如 `100-v1.0.0`）
-- 行为：自动签名构建 release APK，并上传到 GitHub Releases 对应 tag
+- 行为：先校验 tag 与 `app/build.gradle` 的版本配置一致，再自动签名构建 release APK 并上传到 GitHub Releases 对应 tag
 
 发版命令示例：
 

@@ -24,8 +24,30 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.7"
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Validate Tag Against Module Version
+        shell: bash
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          version_code="$(sed -nE 's/^[[:space:]]*def moduleVersionCode = ([0-9]+)[[:space:]]*$/\1/p' app/build.gradle | head -n1)"
+          version_name="$(sed -nE 's/^[[:space:]]*def moduleVersionName = \"([^\"]+)\"[[:space:]]*$/\1/p' app/build.gradle | head -n1)"
+
+          if [[ -z "$version_code" || -z "$version_name" ]]; then
+            echo "Failed to parse moduleVersionCode/moduleVersionName from app/build.gradle"
+            exit 1
+          fi
+
+          expected_tag="${version_code}-${version_name}"
+          if [[ "$TAG_NAME" != "$expected_tag" ]]; then
+            echo "Tag mismatch: expected '$expected_tag', got '$TAG_NAME'"
+            exit 1
+          fi
 
       - name: Validate Signing Secrets
         shell: bash
@@ -59,7 +81,7 @@ jobs:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-        run: gradle :app:assembleRelease --stacktrace
+        run: ./gradlew :app:assembleRelease --stacktrace
 
       - name: Upload Signed APK Artifact
         uses: actions/upload-artifact@v4
