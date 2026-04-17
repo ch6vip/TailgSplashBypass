@@ -3,7 +3,7 @@ name: Android Release (Tag Auto)
 on:
   push:
     tags:
-      - "[0-9]*-*"
+      - "v*"
 
 permissions:
   contents: write
@@ -35,15 +35,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          version_code="$(sed -nE 's/^[[:space:]]*def moduleVersionCode = ([0-9]+)[[:space:]]*$/\1/p' app/build.gradle | head -n1)"
           version_name="$(sed -nE 's/^[[:space:]]*def moduleVersionName = \"([^\"]+)\"[[:space:]]*$/\1/p' app/build.gradle | head -n1)"
 
-          if [[ -z "$version_code" || -z "$version_name" ]]; then
-            echo "Failed to parse moduleVersionCode/moduleVersionName from app/build.gradle"
+          if [[ -z "$version_name" ]]; then
+            echo "Failed to parse moduleVersionName from app/build.gradle"
             exit 1
           fi
 
-          expected_tag="${version_code}-${version_name}"
+          expected_tag="${version_name}"
           if [[ "$TAG_NAME" != "$expected_tag" ]]; then
             echo "Tag mismatch: expected '$expected_tag', got '$TAG_NAME'"
             exit 1
