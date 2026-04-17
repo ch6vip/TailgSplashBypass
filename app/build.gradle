@@ -2,8 +2,8 @@ plugins {
     id "com.android.application"
 }
 
-def moduleVersionName = "v1.0.0"
-def moduleVersionCode = 100
+def moduleVersionName = "v1.1"
+def moduleVersionCode = 101
 def maxVersionCode = 2_100_000_000
 
 def githubRefType = System.getenv("GITHUB_REF_TYPE")
