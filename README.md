@@ -61,17 +61,18 @@
 
 仓库已提供 `.github/workflows/android-release-tag.yml`：
 
-- 触发条件：`push` 一个形如 `v*` 的 tag（例如 `v1.0.1`）
+- 触发条件：`push` 一个形如 `versionCode-versionName` 的 tag（例如 `100-v1.0.0`）
 - 行为：自动签名构建 release APK，并上传到 GitHub Releases 对应 tag
 
 发版命令示例：
 
 ```bash
-git tag v1.0.1
-git push origin v1.0.1
+git tag 100-v1.0.0
+git push origin 100-v1.0.0
 ```
 
 版本号规则：
 
-- 当在 GitHub Actions 的 tag 构建中（`GITHUB_REF_TYPE=tag`）时，APK 的 `versionName` 自动取 tag 名（例如 `v.0.0.1`）。
-- `versionCode` 会按 tag 中数字解析为 `major*10000 + minor*100 + patch`（例如 `v.0.0.1` -> `1`，`v1.2.3` -> `10203`）。
+- `app/build.gradle` 中显式配置了 `moduleVersionCode` 和 `moduleVersionName`。
+- tag 必须严格等于 `${moduleVersionCode}-${moduleVersionName}`；不一致会在构建时直接失败。
+- 当前示例配置为：`moduleVersionCode=100`、`moduleVersionName=v1.0.0`，因此 tag 必须是 `100-v1.0.0`。
