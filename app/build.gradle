@@ -2,8 +2,8 @@ plugins {
     id "com.android.application"
 }
 
-def moduleVersionName = "v1.1"
-def moduleVersionCode = 101
+def defaultVersionName = "v1.0.0"
+def defaultVersionCode = 1
 def maxVersionCode = 2_100_000_000
 
 def githubRefType = System.getenv("GITHUB_REF_TYPE")
@@ -12,15 +12,26 @@ def releaseTagName = (githubRefType == "tag" && githubRefName != null && !github
         ? githubRefName.trim()
         : null
 
-if (moduleVersionCode < 1 || moduleVersionCode > maxVersionCode) {
-    throw new GradleException("Invalid moduleVersionCode=${moduleVersionCode}. Valid range: 1..${maxVersionCode}")
-}
+def resolvedVersionName = releaseTagName ?: defaultVersionName
+def resolvedVersionCode = defaultVersionCode
 
 if (releaseTagName != null) {
-    def expectedTagName = moduleVersionName
-    if (releaseTagName != expectedTagName) {
-        throw new GradleException("Tag mismatch. Expected '${expectedTagName}', got '${releaseTagName}'.")
+    def numberParts = []
+    def matcher = (releaseTagName =~ /\d+/)
+    while (matcher.find()) {
+        numberParts << matcher.group().toInteger()
     }
+
+    if (!numberParts.isEmpty()) {
+        int major = numberParts[0]
+        int minor = numberParts.size() > 1 ? numberParts[1] : 0
+        int patch = numberParts.size() > 2 ? numberParts[2] : 0
+        resolvedVersionCode = Math.max(1, Math.min(maxVersionCode, major * 10_000 + minor * 100 + patch))
+    }
+}
+
+if (resolvedVersionCode < 1 || resolvedVersionCode > maxVersionCode) {
+    throw new GradleException("Invalid resolvedVersionCode=${resolvedVersionCode}. Valid range: 1..${maxVersionCode}")
 }
 
 def signingStoreFile = System.getenv("SIGNING_STORE_FILE")
@@ -41,8 +52,8 @@ android {
         applicationId "com.tailg.lsposed.adblock"
         minSdk 26
         targetSdk 34
-        versionCode moduleVersionCode
-        versionName moduleVersionName
+        versionCode resolvedVersionCode
+        versionName resolvedVersionName
     }
 
     signingConfigs {
