@@ -17,7 +17,7 @@ if (moduleVersionCode < 1 || moduleVersionCode > maxVersionCode) {
 }
 
 if (releaseTagName != null) {
-    def expectedTagName = "${moduleVersionCode}-${moduleVersionName}"
+    def expectedTagName = moduleVersionName
     if (releaseTagName != expectedTagName) {
         throw new GradleException("Tag mismatch. Expected '${expectedTagName}', got '${releaseTagName}'.")
     }
