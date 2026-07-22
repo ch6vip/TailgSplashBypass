@@ -1,6 +1,6 @@
 # Tailg LSPosed AdBlock
 
-针对 `com.tailg.run.intelligence` 的 LSPosed 模块，目标是禁用开屏广告倒计时分支。
+针对 `com.tailg.run.intelligence` 的 LSPosed 模块，目标是禁用开屏广告、首页 Banner 广告与 App 升级弹窗。
 
 ## 实现方式
 
@@ -11,10 +11,22 @@
   - `ConfigGetBean#getIsShow()` -> `"0"`
   - `ConfigGetBean#getHomeResource()/getFootResource()` -> `""`
   - `ConfigGetBean#getDurationTime()` -> `"0"`
+  - `ConfigGetBean#getBanners()/getBannerOssIds()` -> `""`（首页 Banner 广告；`ControlViewModel` 中 `isNotEmptyString(getBanners())` 为假即不渲染）
+  - `CheckAppVersionBean#getIsPop()` -> `"0"`、`getIsForce()` -> `"0"`（App 升级弹窗；`HomeActivity` 仅在 `"1".equals(getIsPop())` 时弹框）
 - 版本检测：运行时记录目标应用 `versionName/versionCode`。
 - 安全策略：
   - 方法签名/返回类型不匹配时自动跳过对应 Hook，不中断其他 Hook
   - 支持按版本前缀白名单校验（可通过配置切换严格模式）
+
+## 界面
+
+设置页采用 **Material 3（`Theme.Material3.DayNight`）**，观感参考 HookVip：
+
+- 开关按「总控 / 开屏广告 / 首页·弹窗 / 调试」分组为圆角卡片，每行标题 + 副标题说明。
+- **即时保存**：拨动开关立即写入 `tailg_adblock`，无需保存按钮（重启目标应用后生效）。
+- **自动明暗（DayNight）**；Android 12+ 由 `DynamicColors` 套用壁纸取色（Material You）。
+- **联动置灰**：关闭「启用模块」置灰其余项；关闭「拦截开屏广告配置」（`hook_config_bean`）置灰其从属的清空资源/倒计时归零/首页 Banner。
+- UI 由 `MainActivity` 中的开关表数据驱动，新增开关只需加一行 + 两条字符串。
 
 ## 可配置开关
 
@@ -24,9 +36,11 @@
 - `strict_version_guard`：仅在受支持版本启用 Hook（默认开启）
 - `hook_setup_view`：启用 `setupView` 重定向
 - `hook_count_down`：启用 `countDown` 重定向
-- `hook_config_bean`：启用 `ConfigGetBean` Hook
+- `hook_config_bean`：启用 `ConfigGetBean` Hook（开屏/Banner 总开关）
 - `force_empty_res`：强制清空开屏资源 URL
 - `force_duration_zero`：强制倒计时为 0
+- `force_empty_banner`：清空首页 Banner 广告（需 `hook_config_bean` 开启，默认开启）
+- `hook_app_update`：拦截 App 升级弹窗（默认开启；仅作用于 `CheckAppVersionBean`，不影响固件/OTA 升级）
 - `verbose_log`：输出详细日志（默认关闭）
 
 ## 构建
@@ -57,6 +71,7 @@
 ## 兼容性说明
 
 - 当前使用 Modern Xposed API（`io.github.libxposed:api:101.0.1`）。
+- 设置页使用 `com.google.android.material:material:1.12.0`（Material 3）；模块 Hook 逻辑本身不依赖它。
 - `minSdk` 设为 26。
 
 ## 签名发布（GitHub）

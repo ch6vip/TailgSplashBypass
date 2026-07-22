@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      HookVip 同款观感：Material 3 + DayNight（自动明暗）。
+      Android 12+ 由 DynamicColors 在运行时套用壁纸取色（Material You）；
+      更低版本回退到 M3 基线配色。状态栏透明，交给 AppBarLayout 处理内边距。
+    -->
+    <style name="Theme.TailgAdblock" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">?attr/isLightTheme</item>
+    </style>
+</resources>

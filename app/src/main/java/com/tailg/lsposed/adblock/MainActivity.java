@@ -1,113 +1,196 @@
 package com.tailg.lsposed.adblock;
 
-import android.app.Activity;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.util.TypedValue;
-import android.view.ViewGroup;
-import android.widget.Button;
+import android.view.LayoutInflater;
+import android.view.View;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
-import android.widget.Switch;
 import android.widget.TextView;
-import android.widget.Toast;
 
-public class MainActivity extends Activity {
+import androidx.appcompat.app.AppCompatActivity;
+
+import com.google.android.material.appbar.CollapsingToolbarLayout;
+import com.google.android.material.color.DynamicColors;
+import com.google.android.material.materialswitch.MaterialSwitch;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 设置页（模块 Launcher 图标）。
+ *
+ * <p>观感参考 HookVip：Material 3 + DayNight，Android 12+ 动态取色。开关分组为卡片，
+ * 每行标题 + 副标题；即时保存；主开关与 ConfigGetBean 总开关关闭时联动置灰其从属项。</p>
+ *
+ * <p>UI 由数据驱动：{@link #buildSpecs()} 定义所有开关及其分组/依赖，界面按此生成，
+ * 后续新增开关只需在该表加一行 + 两条字符串。</p>
+ */
+public class MainActivity extends AppCompatActivity {
     private SharedPreferences prefs;
-    private Switch enableModuleSwitch;
-    private Switch strictVersionGuardSwitch;
-    private Switch setupViewSwitch;
-    private Switch countDownSwitch;
-    private Switch configBeanSwitch;
-    private Switch emptyResSwitch;
-    private Switch durationZeroSwitch;
-    private Switch verboseLogSwitch;
+    private final Map<String, MaterialSwitch> switches = new LinkedHashMap<>();
+    private final Map<String, View> rows = new LinkedHashMap<>();
+    private final List<ToggleSpec> specs = buildSpecs();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        DynamicColors.applyToActivityIfAvailable(this);
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences(ConfigKeys.PREFS_NAME, MODE_PRIVATE);
-        setTitle(R.string.settings_title);
-        setContentView(buildContentView());
-        bindInitialValues();
+        setContentView(R.layout.activity_main);
+
+        CollapsingToolbarLayout collapsing = findViewById(R.id.collapsing_toolbar);
+        collapsing.setTitle(getString(R.string.header_title));
+
+        buildSections();
+        applyGating();
     }
 
-    private ScrollView buildContentView() {
-        ScrollView root = new ScrollView(this);
-        LinearLayout container = new LinearLayout(this);
-        container.setOrientation(LinearLayout.VERTICAL);
-        int padding = dp(16);
-        container.setPadding(padding, padding, padding, padding);
-        root.addView(container, new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        ));
+    private void buildSections() {
+        LinearLayout container = findViewById(R.id.sections_container);
+        LayoutInflater inflater = LayoutInflater.from(this);
 
-        TextView tip = new TextView(this);
-        tip.setText(R.string.settings_tip_restart);
-        container.addView(tip);
+        for (Group group : Group.values()) {
+            List<ToggleSpec> groupSpecs = specsForGroup(group);
+            if (groupSpecs.isEmpty()) {
+                continue;
+            }
 
-        enableModuleSwitch = createSwitch(R.string.switch_enable_module, ConfigKeys.DEFAULT_ENABLE_MODULE, container);
-        strictVersionGuardSwitch = createSwitch(
-                R.string.switch_strict_version_guard,
-                ConfigKeys.DEFAULT_STRICT_VERSION_GUARD,
-                container
-        );
-        setupViewSwitch = createSwitch(R.string.switch_hook_setup_view, ConfigKeys.DEFAULT_HOOK_SETUP_VIEW, container);
-        countDownSwitch = createSwitch(R.string.switch_hook_count_down, ConfigKeys.DEFAULT_HOOK_COUNT_DOWN, container);
-        configBeanSwitch = createSwitch(R.string.switch_hook_config_bean, ConfigKeys.DEFAULT_HOOK_CONFIG_BEAN, container);
-        emptyResSwitch = createSwitch(R.string.switch_force_empty_res, ConfigKeys.DEFAULT_FORCE_EMPTY_RES, container);
-        durationZeroSwitch = createSwitch(R.string.switch_force_duration_zero, ConfigKeys.DEFAULT_FORCE_DURATION_ZERO, container);
-        verboseLogSwitch = createSwitch(R.string.switch_verbose_log, ConfigKeys.DEFAULT_VERBOSE_LOG, container);
+            View section = inflater.inflate(R.layout.view_section, container, false);
+            TextView sectionTitle = section.findViewById(R.id.section_title);
+            sectionTitle.setText(group.titleRes);
+            LinearLayout rowsContainer = section.findViewById(R.id.section_rows);
 
-        Button saveButton = new Button(this);
-        saveButton.setText(R.string.save_button_text);
-        saveButton.setOnClickListener(v -> saveConfig());
-        container.addView(saveButton);
-        return root;
+            for (ToggleSpec spec : groupSpecs) {
+                View row = inflater.inflate(R.layout.row_switch, rowsContainer, false);
+                TextView title = row.findViewById(R.id.row_title);
+                TextView subtitle = row.findViewById(R.id.row_subtitle);
+                MaterialSwitch toggle = row.findViewById(R.id.row_switch);
+
+                title.setText(spec.titleRes);
+                subtitle.setText(spec.descRes);
+                toggle.setChecked(prefs.getBoolean(spec.key, spec.def));
+                toggle.setOnCheckedChangeListener((button, checked) -> {
+                    prefs.edit().putBoolean(spec.key, checked).apply();
+                    applyGating();
+                });
+                row.setOnClickListener(v -> toggle.toggle());
+
+                switches.put(spec.key, toggle);
+                rows.put(spec.key, row);
+                rowsContainer.addView(row);
+            }
+            container.addView(section);
+        }
     }
 
-    private Switch createSwitch(int titleResId, boolean defaultValue, LinearLayout parent) {
-        Switch sw = new Switch(this);
-        sw.setText(titleResId);
-        sw.setChecked(defaultValue);
-        parent.addView(sw);
-        return sw;
+    /**
+     * 依据主开关与各自的父开关状态置灰从属项。不改动被置灰开关的存储值，
+     * 因此父开关重新打开后子项恢复原状态。
+     */
+    private void applyGating() {
+        boolean masterOn = isChecked(ConfigKeys.KEY_ENABLE_MODULE, ConfigKeys.DEFAULT_ENABLE_MODULE);
+        for (ToggleSpec spec : specs) {
+            boolean enabled;
+            if (ConfigKeys.KEY_ENABLE_MODULE.equals(spec.key)) {
+                enabled = true;
+            } else if (spec.dependsOn != null) {
+                enabled = masterOn && isChecked(spec.dependsOn, true);
+            } else {
+                enabled = masterOn;
+            }
+            setRowEnabled(spec.key, enabled);
+        }
     }
 
-    private void bindInitialValues() {
-        enableModuleSwitch.setChecked(prefs.getBoolean(ConfigKeys.KEY_ENABLE_MODULE, ConfigKeys.DEFAULT_ENABLE_MODULE));
-        strictVersionGuardSwitch.setChecked(prefs.getBoolean(
-                ConfigKeys.KEY_STRICT_VERSION_GUARD,
-                ConfigKeys.DEFAULT_STRICT_VERSION_GUARD
-        ));
-        setupViewSwitch.setChecked(prefs.getBoolean(ConfigKeys.KEY_HOOK_SETUP_VIEW, ConfigKeys.DEFAULT_HOOK_SETUP_VIEW));
-        countDownSwitch.setChecked(prefs.getBoolean(ConfigKeys.KEY_HOOK_COUNT_DOWN, ConfigKeys.DEFAULT_HOOK_COUNT_DOWN));
-        configBeanSwitch.setChecked(prefs.getBoolean(ConfigKeys.KEY_HOOK_CONFIG_BEAN, ConfigKeys.DEFAULT_HOOK_CONFIG_BEAN));
-        emptyResSwitch.setChecked(prefs.getBoolean(ConfigKeys.KEY_FORCE_EMPTY_RES, ConfigKeys.DEFAULT_FORCE_EMPTY_RES));
-        durationZeroSwitch.setChecked(prefs.getBoolean(ConfigKeys.KEY_FORCE_DURATION_ZERO, ConfigKeys.DEFAULT_FORCE_DURATION_ZERO));
-        verboseLogSwitch.setChecked(prefs.getBoolean(ConfigKeys.KEY_VERBOSE_LOG, ConfigKeys.DEFAULT_VERBOSE_LOG));
+    private boolean isChecked(String key, boolean def) {
+        MaterialSwitch toggle = switches.get(key);
+        return toggle != null ? toggle.isChecked() : prefs.getBoolean(key, def);
     }
 
-    private void saveConfig() {
-        prefs.edit()
-                .putBoolean(ConfigKeys.KEY_ENABLE_MODULE, enableModuleSwitch.isChecked())
-                .putBoolean(ConfigKeys.KEY_STRICT_VERSION_GUARD, strictVersionGuardSwitch.isChecked())
-                .putBoolean(ConfigKeys.KEY_HOOK_SETUP_VIEW, setupViewSwitch.isChecked())
-                .putBoolean(ConfigKeys.KEY_HOOK_COUNT_DOWN, countDownSwitch.isChecked())
-                .putBoolean(ConfigKeys.KEY_HOOK_CONFIG_BEAN, configBeanSwitch.isChecked())
-                .putBoolean(ConfigKeys.KEY_FORCE_EMPTY_RES, emptyResSwitch.isChecked())
-                .putBoolean(ConfigKeys.KEY_FORCE_DURATION_ZERO, durationZeroSwitch.isChecked())
-                .putBoolean(ConfigKeys.KEY_VERBOSE_LOG, verboseLogSwitch.isChecked())
-                .apply();
-        Toast.makeText(this, R.string.settings_saved_toast, Toast.LENGTH_SHORT).show();
+    private void setRowEnabled(String key, boolean enabled) {
+        View row = rows.get(key);
+        MaterialSwitch toggle = switches.get(key);
+        if (row == null || toggle == null) {
+            return;
+        }
+        toggle.setEnabled(enabled);
+        row.setEnabled(enabled);
+        row.setClickable(enabled);
+        row.setAlpha(enabled ? 1f : 0.4f);
     }
 
-    private int dp(int value) {
-        return (int) TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_DIP,
-                value,
-                getResources().getDisplayMetrics()
-        );
+    private List<ToggleSpec> specsForGroup(Group group) {
+        List<ToggleSpec> result = new ArrayList<>();
+        for (ToggleSpec spec : specs) {
+            if (spec.group == group) {
+                result.add(spec);
+            }
+        }
+        return result;
+    }
+
+    private List<ToggleSpec> buildSpecs() {
+        List<ToggleSpec> list = new ArrayList<>();
+        list.add(new ToggleSpec(ConfigKeys.KEY_ENABLE_MODULE, R.string.switch_enable_module,
+                R.string.desc_enable_module, ConfigKeys.DEFAULT_ENABLE_MODULE, Group.GENERAL, null));
+        list.add(new ToggleSpec(ConfigKeys.KEY_STRICT_VERSION_GUARD, R.string.switch_strict_version_guard,
+                R.string.desc_strict_version_guard, ConfigKeys.DEFAULT_STRICT_VERSION_GUARD, Group.GENERAL, null));
+
+        list.add(new ToggleSpec(ConfigKeys.KEY_HOOK_SETUP_VIEW, R.string.switch_hook_setup_view,
+                R.string.desc_hook_setup_view, ConfigKeys.DEFAULT_HOOK_SETUP_VIEW, Group.SPLASH, null));
+        list.add(new ToggleSpec(ConfigKeys.KEY_HOOK_COUNT_DOWN, R.string.switch_hook_count_down,
+                R.string.desc_hook_count_down, ConfigKeys.DEFAULT_HOOK_COUNT_DOWN, Group.SPLASH, null));
+        list.add(new ToggleSpec(ConfigKeys.KEY_HOOK_CONFIG_BEAN, R.string.switch_hook_config_bean,
+                R.string.desc_hook_config_bean, ConfigKeys.DEFAULT_HOOK_CONFIG_BEAN, Group.SPLASH, null));
+        list.add(new ToggleSpec(ConfigKeys.KEY_FORCE_EMPTY_RES, R.string.switch_force_empty_res,
+                R.string.desc_force_empty_res, ConfigKeys.DEFAULT_FORCE_EMPTY_RES, Group.SPLASH,
+                ConfigKeys.KEY_HOOK_CONFIG_BEAN));
+        list.add(new ToggleSpec(ConfigKeys.KEY_FORCE_DURATION_ZERO, R.string.switch_force_duration_zero,
+                R.string.desc_force_duration_zero, ConfigKeys.DEFAULT_FORCE_DURATION_ZERO, Group.SPLASH,
+                ConfigKeys.KEY_HOOK_CONFIG_BEAN));
+
+        list.add(new ToggleSpec(ConfigKeys.KEY_FORCE_EMPTY_BANNER, R.string.switch_force_empty_banner,
+                R.string.desc_force_empty_banner, ConfigKeys.DEFAULT_FORCE_EMPTY_BANNER, Group.HOME,
+                ConfigKeys.KEY_HOOK_CONFIG_BEAN));
+        list.add(new ToggleSpec(ConfigKeys.KEY_HOOK_APP_UPDATE, R.string.switch_hook_app_update,
+                R.string.desc_hook_app_update, ConfigKeys.DEFAULT_HOOK_APP_UPDATE, Group.HOME, null));
+
+        list.add(new ToggleSpec(ConfigKeys.KEY_VERBOSE_LOG, R.string.switch_verbose_log,
+                R.string.desc_verbose_log, ConfigKeys.DEFAULT_VERBOSE_LOG, Group.DEBUG, null));
+        return list;
+    }
+
+    private enum Group {
+        GENERAL(R.string.group_general),
+        SPLASH(R.string.group_splash),
+        HOME(R.string.group_home),
+        DEBUG(R.string.group_debug);
+
+        final int titleRes;
+
+        Group(int titleRes) {
+            this.titleRes = titleRes;
+        }
+    }
+
+    private static final class ToggleSpec {
+        final String key;
+        final int titleRes;
+        final int descRes;
+        final boolean def;
+        final Group group;
+        /** 该开关的父开关 key；父开关关闭时本项置灰。null 表示仅受主开关约束。 */
+        final String dependsOn;
+
+        ToggleSpec(String key, int titleRes, int descRes, boolean def, Group group, String dependsOn) {
+            this.key = key;
+            this.titleRes = titleRes;
+            this.descRes = descRes;
+            this.def = def;
+            this.group = group;
+            this.dependsOn = dependsOn;
+        }
     }
 }
