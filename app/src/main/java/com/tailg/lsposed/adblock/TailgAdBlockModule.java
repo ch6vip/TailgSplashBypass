@@ -19,6 +19,8 @@ public class TailgAdBlockModule extends XposedModule {
             "com.tailg.run.intelligence.model.splash.activity.SplashActivity";
     private static final String CONFIG_GET_BEAN =
             "com.tailg.run.intelligence.model.home.bean.ConfigGetBean";
+    private static final String CHECK_APP_VERSION_BEAN =
+            "com.tailg.run.intelligence.model.mine_setting.bean.CheckAppVersionBean";
 
     private final AtomicBoolean hooksInstalled = new AtomicBoolean(false);
 
@@ -61,7 +63,9 @@ public class TailgAdBlockModule extends XposedModule {
                 config.hookCountDown,
                 config.hookConfigBean,
                 config.forceEmptyRes,
-                config.forceDurationZero
+                config.forceDurationZero,
+                config.forceEmptyBanner,
+                config.hookAppUpdate
         );
         HookInstallReport report = new HookInstallReport();
         report.markRequested(requestPlan.totalRequestCount());
@@ -72,6 +76,9 @@ public class TailgAdBlockModule extends XposedModule {
             }
             if (requestPlan.hasConfigBeanHooks()) {
                 installConfigBeanHooks(classLoader, config, report);
+            }
+            if (requestPlan.hasAppUpdateHooks()) {
+                installAppUpdateHooks(classLoader, config, report);
             }
             logInstallSummary(report);
 
@@ -113,6 +120,22 @@ public class TailgAdBlockModule extends XposedModule {
         if (config.forceDurationZero) {
             hookStringMethod(beanClazz, "getDurationTime", "0", config.verboseLog, report);
         }
+        if (config.forceEmptyBanner) {
+            hookStringMethod(beanClazz, "getBanners", "", config.verboseLog, report);
+            hookStringMethod(beanClazz, "getBannerOssIds", "", config.verboseLog, report);
+        }
+    }
+
+    private void installAppUpdateHooks(ClassLoader classLoader, ModuleConfig config, HookInstallReport report) {
+        Class<?> beanClazz = tryLoadClass(classLoader, CHECK_APP_VERSION_BEAN, "CheckAppVersionBean", report);
+        if (beanClazz == null) {
+            return;
+        }
+
+        // HomeActivity 仅在 "1".equals(getIsPop()) 时弹升级框；置 "0" 直接短路掉自动弹窗。
+        hookStringMethod(beanClazz, "getIsPop", "0", config.verboseLog, report);
+        // 兜底：即使别处仍触发升级框，也保证不是强制/阻塞式。
+        hookStringMethod(beanClazz, "getIsForce", "0", config.verboseLog, report);
     }
 
     private Class<?> tryLoadClass(ClassLoader classLoader, String className, String alias, HookInstallReport report) {
@@ -240,6 +263,8 @@ public class TailgAdBlockModule extends XposedModule {
                 prefs.getBoolean(ConfigKeys.KEY_HOOK_CONFIG_BEAN, defaults.hookConfigBean),
                 prefs.getBoolean(ConfigKeys.KEY_FORCE_EMPTY_RES, defaults.forceEmptyRes),
                 prefs.getBoolean(ConfigKeys.KEY_FORCE_DURATION_ZERO, defaults.forceDurationZero),
+                prefs.getBoolean(ConfigKeys.KEY_FORCE_EMPTY_BANNER, defaults.forceEmptyBanner),
+                prefs.getBoolean(ConfigKeys.KEY_HOOK_APP_UPDATE, defaults.hookAppUpdate),
                 prefs.getBoolean(ConfigKeys.KEY_VERBOSE_LOG, defaults.verboseLog)
         );
     }
@@ -295,6 +320,8 @@ public class TailgAdBlockModule extends XposedModule {
         final boolean hookConfigBean;
         final boolean forceEmptyRes;
         final boolean forceDurationZero;
+        final boolean forceEmptyBanner;
+        final boolean hookAppUpdate;
         final boolean verboseLog;
 
         ModuleConfig(
@@ -305,6 +332,8 @@ public class TailgAdBlockModule extends XposedModule {
                 boolean hookConfigBean,
                 boolean forceEmptyRes,
                 boolean forceDurationZero,
+                boolean forceEmptyBanner,
+                boolean hookAppUpdate,
                 boolean verboseLog
         ) {
             this.enableModule = enableModule;
@@ -314,6 +343,8 @@ public class TailgAdBlockModule extends XposedModule {
             this.hookConfigBean = hookConfigBean;
             this.forceEmptyRes = forceEmptyRes;
             this.forceDurationZero = forceDurationZero;
+            this.forceEmptyBanner = forceEmptyBanner;
+            this.hookAppUpdate = hookAppUpdate;
             this.verboseLog = verboseLog;
         }
 
@@ -326,6 +357,8 @@ public class TailgAdBlockModule extends XposedModule {
                     ConfigKeys.DEFAULT_HOOK_CONFIG_BEAN,
                     ConfigKeys.DEFAULT_FORCE_EMPTY_RES,
                     ConfigKeys.DEFAULT_FORCE_DURATION_ZERO,
+                    ConfigKeys.DEFAULT_FORCE_EMPTY_BANNER,
+                    ConfigKeys.DEFAULT_HOOK_APP_UPDATE,
                     ConfigKeys.DEFAULT_VERBOSE_LOG
             );
         }

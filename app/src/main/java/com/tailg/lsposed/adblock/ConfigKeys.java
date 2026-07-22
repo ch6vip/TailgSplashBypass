@@ -9,6 +9,8 @@ final class ConfigKeys {
     static final String KEY_HOOK_CONFIG_BEAN = "hook_config_bean";
     static final String KEY_FORCE_EMPTY_RES = "force_empty_res";
     static final String KEY_FORCE_DURATION_ZERO = "force_duration_zero";
+    static final String KEY_FORCE_EMPTY_BANNER = "force_empty_banner";
+    static final String KEY_HOOK_APP_UPDATE = "hook_app_update";
     static final String KEY_VERBOSE_LOG = "verbose_log";
 
     static final boolean DEFAULT_ENABLE_MODULE = true;
@@ -18,6 +20,8 @@ final class ConfigKeys {
     static final boolean DEFAULT_HOOK_CONFIG_BEAN = true;
     static final boolean DEFAULT_FORCE_EMPTY_RES = true;
     static final boolean DEFAULT_FORCE_DURATION_ZERO = true;
+    static final boolean DEFAULT_FORCE_EMPTY_BANNER = true;
+    static final boolean DEFAULT_HOOK_APP_UPDATE = true;
     static final boolean DEFAULT_VERBOSE_LOG = false;
 
     private ConfigKeys() {

@@ -3,10 +3,12 @@ package com.tailg.lsposed.adblock;
 final class HookRequestPlan {
     private final int splashRequestCount;
     private final int configBeanRequestCount;
+    private final int appUpdateRequestCount;
 
-    private HookRequestPlan(int splashRequestCount, int configBeanRequestCount) {
+    private HookRequestPlan(int splashRequestCount, int configBeanRequestCount, int appUpdateRequestCount) {
         this.splashRequestCount = splashRequestCount;
         this.configBeanRequestCount = configBeanRequestCount;
+        this.appUpdateRequestCount = appUpdateRequestCount;
     }
 
     static HookRequestPlan fromConfig(
@@ -14,7 +16,9 @@ final class HookRequestPlan {
             boolean hookCountDown,
             boolean hookConfigBean,
             boolean forceEmptyRes,
-            boolean forceDurationZero
+            boolean forceDurationZero,
+            boolean forceEmptyBanner,
+            boolean hookAppUpdate
     ) {
         int splash = 0;
         if (hookSetupView) {
@@ -33,9 +37,17 @@ final class HookRequestPlan {
             if (forceDurationZero) {
                 configBean++; // getDurationTime
             }
+            if (forceEmptyBanner) {
+                configBean += 2; // getBanners + getBannerOssIds
+            }
         }
 
-        return new HookRequestPlan(splash, configBean);
+        int appUpdate = 0;
+        if (hookAppUpdate) {
+            appUpdate += 2; // getIsPop + getIsForce
+        }
+
+        return new HookRequestPlan(splash, configBean, appUpdate);
     }
 
     boolean hasSplashHooks() {
@@ -46,6 +58,10 @@ final class HookRequestPlan {
         return configBeanRequestCount > 0;
     }
 
+    boolean hasAppUpdateHooks() {
+        return appUpdateRequestCount > 0;
+    }
+
     int splashRequestCount() {
         return splashRequestCount;
     }
@@ -54,7 +70,11 @@ final class HookRequestPlan {
         return configBeanRequestCount;
     }
 
+    int appUpdateRequestCount() {
+        return appUpdateRequestCount;
+    }
+
     int totalRequestCount() {
-        return splashRequestCount + configBeanRequestCount;
+        return splashRequestCount + configBeanRequestCount + appUpdateRequestCount;
     }
 }
