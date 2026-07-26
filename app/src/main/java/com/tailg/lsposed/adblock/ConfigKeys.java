@@ -19,6 +19,10 @@ final class ConfigKeys {
     static final String KEY_SWAP_CONTROL_SERVICE_NAV = "swap_control_service_nav";
     static final String KEY_ENABLE_TRACK_EXPORT = "enable_track_export";
     static final String KEY_TRIM_TRACK_ENDPOINTS = "trim_track_endpoints";
+    static final String KEY_ENABLE_MONTHLY_RIDE_DATA = "enable_monthly_ride_data";
+    static final String KEY_SHOW_BRAKE_FORCE_DATA = "show_brake_force_data";
+    static final String KEY_SHOW_BATTERY_DYNAMICS_ENTRY = "show_battery_dynamics_entry";
+    static final String KEY_SHOW_CUSTOM_VEHICLE_SOUND = "show_custom_vehicle_sound";
     static final String KEY_ENABLE_VEHICLE_DIAGNOSTICS = "enable_vehicle_diagnostics";
     static final String KEY_OVERRIDE_PROXIMITY_DISTANCE = "override_proximity_distance";
     static final String KEY_PROXIMITY_UNLOCK_METERS = "proximity_unlock_meters";
@@ -45,6 +49,10 @@ final class ConfigKeys {
     static final boolean DEFAULT_SWAP_CONTROL_SERVICE_NAV = false;
     static final boolean DEFAULT_ENABLE_TRACK_EXPORT = true;
     static final boolean DEFAULT_TRIM_TRACK_ENDPOINTS = true;
+    static final boolean DEFAULT_ENABLE_MONTHLY_RIDE_DATA = false;
+    static final boolean DEFAULT_SHOW_BRAKE_FORCE_DATA = false;
+    static final boolean DEFAULT_SHOW_BATTERY_DYNAMICS_ENTRY = false;
+    static final boolean DEFAULT_SHOW_CUSTOM_VEHICLE_SOUND = false;
     static final boolean DEFAULT_ENABLE_VEHICLE_DIAGNOSTICS = true;
     static final boolean DEFAULT_OVERRIDE_PROXIMITY_DISTANCE = false;
     static final float DEFAULT_PROXIMITY_UNLOCK_METERS = 2.0f;
@@ -72,6 +80,10 @@ final class ConfigKeys {
             KEY_SWAP_CONTROL_SERVICE_NAV,
             KEY_ENABLE_TRACK_EXPORT,
             KEY_TRIM_TRACK_ENDPOINTS,
+            KEY_ENABLE_MONTHLY_RIDE_DATA,
+            KEY_SHOW_BRAKE_FORCE_DATA,
+            KEY_SHOW_BATTERY_DYNAMICS_ENTRY,
+            KEY_SHOW_CUSTOM_VEHICLE_SOUND,
             KEY_ENABLE_VEHICLE_DIAGNOSTICS,
             KEY_OVERRIDE_PROXIMITY_DISTANCE,
             KEY_BLE_RECONNECT,
@@ -123,6 +135,14 @@ final class ConfigKeys {
                 return DEFAULT_ENABLE_TRACK_EXPORT;
             case KEY_TRIM_TRACK_ENDPOINTS:
                 return DEFAULT_TRIM_TRACK_ENDPOINTS;
+            case KEY_ENABLE_MONTHLY_RIDE_DATA:
+                return DEFAULT_ENABLE_MONTHLY_RIDE_DATA;
+            case KEY_SHOW_BRAKE_FORCE_DATA:
+                return DEFAULT_SHOW_BRAKE_FORCE_DATA;
+            case KEY_SHOW_BATTERY_DYNAMICS_ENTRY:
+                return DEFAULT_SHOW_BATTERY_DYNAMICS_ENTRY;
+            case KEY_SHOW_CUSTOM_VEHICLE_SOUND:
+                return DEFAULT_SHOW_CUSTOM_VEHICLE_SOUND;
             case KEY_ENABLE_VEHICLE_DIAGNOSTICS:
                 return DEFAULT_ENABLE_VEHICLE_DIAGNOSTICS;
             case KEY_OVERRIDE_PROXIMITY_DISTANCE:

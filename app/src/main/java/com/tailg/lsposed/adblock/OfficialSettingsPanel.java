@@ -840,6 +840,19 @@ final class OfficialSettingsPanel {
                 "导出时移除首尾附近各 200 米", ConfigKeys.DEFAULT_TRIM_TRACK_ENDPOINTS,
                 Group.DATA, ConfigKeys.KEY_ENABLE_TRACK_EXPORT);
 
+        add(result, ConfigKeys.KEY_ENABLE_MONTHLY_RIDE_DATA, "月度骑行数据页",
+                "放开首页月度详情入口，保留官方数据分流",
+                ConfigKeys.DEFAULT_ENABLE_MONTHLY_RIDE_DATA, Group.HIDDEN, null);
+        add(result, ConfigKeys.KEY_SHOW_BRAKE_FORCE_DATA, "骑行记录制动力",
+                "在官方轨迹回放显示制动力，无数据时可能为空",
+                ConfigKeys.DEFAULT_SHOW_BRAKE_FORCE_DATA, Group.HIDDEN, null);
+        add(result, ConfigKeys.KEY_SHOW_BATTERY_DYNAMICS_ENTRY, "电池动态页面入口",
+                "在主车设置中补充官方电池历史页",
+                ConfigKeys.DEFAULT_SHOW_BATTERY_DYNAMICS_ENTRY, Group.HIDDEN, null);
+        add(result, ConfigKeys.KEY_SHOW_CUSTOM_VEHICLE_SOUND, "自定义车辆音效",
+                "仅车辆上报支持时补充官方音效入口",
+                ConfigKeys.DEFAULT_SHOW_CUSTOM_VEHICLE_SOUND, Group.HIDDEN, null);
+
         add(result, ConfigKeys.KEY_OVERRIDE_PROXIMITY_DISTANCE, "覆盖旧版 RSSI 距离",
                 "只修改旧 BleConnectService 阈值", ConfigKeys.DEFAULT_OVERRIDE_PROXIMITY_DISTANCE,
                 Group.PROXIMITY, null);
@@ -1072,6 +1085,7 @@ final class OfficialSettingsPanel {
         BLE("车辆连接"),
         PRIVACY("隐私"),
         DATA("轨迹数据"),
+        HIDDEN("隐藏功能"),
         PROXIMITY("旧版 RSSI 感应距离"),
         DEBUG("调试");
 

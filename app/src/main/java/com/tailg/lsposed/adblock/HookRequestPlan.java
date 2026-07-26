@@ -8,6 +8,7 @@ final class HookRequestPlan {
     private final int repositoryRequestCount;
     private final int homeActivityRequestCount;
     private final int trackExportRequestCount;
+    private final int hiddenFeatureRequestCount;
     private final int proximityRequestCount;
     private final int officialSettingsRequestCount;
 
@@ -19,6 +20,7 @@ final class HookRequestPlan {
             int repositoryRequestCount,
             int homeActivityRequestCount,
             int trackExportRequestCount,
+            int hiddenFeatureRequestCount,
             int proximityRequestCount,
             int officialSettingsRequestCount
     ) {
@@ -29,6 +31,7 @@ final class HookRequestPlan {
         this.repositoryRequestCount = repositoryRequestCount;
         this.homeActivityRequestCount = homeActivityRequestCount;
         this.trackExportRequestCount = trackExportRequestCount;
+        this.hiddenFeatureRequestCount = hiddenFeatureRequestCount;
         this.proximityRequestCount = proximityRequestCount;
         this.officialSettingsRequestCount = officialSettingsRequestCount;
     }
@@ -48,6 +51,10 @@ final class HookRequestPlan {
             boolean swapControlServiceNav,
             boolean enableVehicleDiagnostics,
             boolean enableTrackExport,
+            boolean enableMonthlyRideData,
+            boolean showBrakeForceData,
+            boolean showBatteryDynamicsEntry,
+            boolean showCustomVehicleSound,
             boolean overrideProximityDistance,
             boolean bleReconnect,
             boolean showOfficialSettingsEntry
@@ -85,6 +92,9 @@ final class HookRequestPlan {
                 + (simplifyHomeNav || swapControlServiceNav || enableVehicleDiagnostics ? 1 : 0)
                 + (bleReconnect ? 1 : 0);
         int trackExport = enableTrackExport ? 1 : 0;
+        int hiddenFeatures = (enableMonthlyRideData ? 2 : 0)
+                + (showBrakeForceData ? 1 : 0)
+                + (showBatteryDynamicsEntry || showCustomVehicleSound ? 1 : 0);
         int proximity = overrideProximityDistance ? 2 : 0;
         int officialSettings = showOfficialSettingsEntry ? 2 : 0;
 
@@ -96,6 +106,7 @@ final class HookRequestPlan {
                 repository,
                 homeActivity,
                 trackExport,
+                hiddenFeatures,
                 proximity,
                 officialSettings
         );
@@ -127,6 +138,10 @@ final class HookRequestPlan {
 
     boolean hasTrackExportHooks() {
         return trackExportRequestCount > 0;
+    }
+
+    boolean hasHiddenFeatureHooks() {
+        return hiddenFeatureRequestCount > 0;
     }
 
     boolean hasProximityHooks() {
@@ -165,6 +180,10 @@ final class HookRequestPlan {
         return trackExportRequestCount;
     }
 
+    int hiddenFeatureRequestCount() {
+        return hiddenFeatureRequestCount;
+    }
+
     int proximityRequestCount() {
         return proximityRequestCount;
     }
@@ -181,6 +200,7 @@ final class HookRequestPlan {
                 + repositoryRequestCount
                 + homeActivityRequestCount
                 + trackExportRequestCount
+                + hiddenFeatureRequestCount
                 + proximityRequestCount
                 + officialSettingsRequestCount;
     }

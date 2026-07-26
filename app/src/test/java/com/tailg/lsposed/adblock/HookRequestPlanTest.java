@@ -9,124 +9,62 @@ import static org.junit.Assert.assertTrue;
 public class HookRequestPlanTest {
     @Test
     public void allEnabled_countsAllRequests() {
-        HookRequestPlan plan = HookRequestPlan.fromConfig(
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true
-        );
+        HookRequestPlan plan = Flags.allEnabled().build();
 
         assertTrue(plan.hasSplashHooks());
         assertTrue(plan.hasConfigBeanHooks());
         assertTrue(plan.hasAppUpdateHooks());
+        assertTrue(plan.hasHiddenFeatureHooks());
         assertEquals(2, plan.splashRequestCount());
-        // getIsShow + (getHomeResource + getFootResource) + getDurationTime + (getBanners + getBannerOssIds)
+        // getIsShow + resources + duration + banners.
         assertEquals(6, plan.configBeanRequestCount());
-        // getIsPop + getIsForce
         assertEquals(2, plan.appUpdateRequestCount());
         assertEquals(5, plan.fastStartupRequestCount());
         assertEquals(1, plan.repositoryRequestCount());
         assertEquals(3, plan.homeActivityRequestCount());
         assertEquals(1, plan.trackExportRequestCount());
+        // Monthly entry scope + capability, brake force, and one shared TBox list hook.
+        assertEquals(4, plan.hiddenFeatureRequestCount());
         assertEquals(2, plan.proximityRequestCount());
         assertEquals(2, plan.officialSettingsRequestCount());
-        assertEquals(24, plan.totalRequestCount());
+        assertEquals(28, plan.totalRequestCount());
     }
 
     @Test
     public void configBeanDisabled_ignoresForceFlags() {
-        HookRequestPlan plan = HookRequestPlan.fromConfig(
-                false,
-                true,
-                false,
-                true,
-                true,
-                true,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false
-        );
+        Flags flags = new Flags();
+        flags.hookCountDown = true;
+        flags.forceEmptyRes = true;
+        flags.forceDurationZero = true;
+        flags.forceEmptyBanner = true;
+        HookRequestPlan plan = flags.build();
 
         assertTrue(plan.hasSplashHooks());
         assertFalse(plan.hasConfigBeanHooks());
         assertFalse(plan.hasAppUpdateHooks());
         assertEquals(1, plan.splashRequestCount());
-        // forceEmptyBanner is ignored while the ConfigGetBean master flag is off.
         assertEquals(0, plan.configBeanRequestCount());
         assertEquals(1, plan.totalRequestCount());
     }
 
     @Test
     public void bannerCountedUnderConfigBean() {
-        HookRequestPlan plan = HookRequestPlan.fromConfig(
-                false,
-                false,
-                true,
-                false,
-                false,
-                true,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false
-        );
+        Flags flags = new Flags();
+        flags.hookConfigBean = true;
+        flags.forceEmptyBanner = true;
+        HookRequestPlan plan = flags.build();
 
         assertTrue(plan.hasConfigBeanHooks());
         assertFalse(plan.hasAppUpdateHooks());
-        // getIsShow + (getBanners + getBannerOssIds)
         assertEquals(3, plan.configBeanRequestCount());
         assertEquals(3, plan.totalRequestCount());
     }
 
     @Test
     public void appUpdateHooks_countedIndependently() {
-        HookRequestPlan plan = HookRequestPlan.fromConfig(
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                true,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false
-        );
+        Flags flags = new Flags();
+        flags.hookAppUpdate = true;
+        HookRequestPlan plan = flags.build();
 
         assertFalse(plan.hasSplashHooks());
         assertFalse(plan.hasConfigBeanHooks());
@@ -137,53 +75,20 @@ public class HookRequestPlanTest {
 
     @Test
     public void allDisabled_hasZeroRequests() {
-        HookRequestPlan plan = HookRequestPlan.fromConfig(
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false
-        );
+        HookRequestPlan plan = new Flags().build();
 
         assertFalse(plan.hasSplashHooks());
         assertFalse(plan.hasConfigBeanHooks());
         assertFalse(plan.hasAppUpdateHooks());
+        assertFalse(plan.hasHiddenFeatureHooks());
         assertEquals(0, plan.totalRequestCount());
     }
 
     @Test
     public void officialSettingsEntry_countsRevisionAndLegacyHooks() {
-        HookRequestPlan plan = HookRequestPlan.fromConfig(
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                true
-        );
+        Flags flags = new Flags();
+        flags.showOfficialSettingsEntry = true;
+        HookRequestPlan plan = flags.build();
 
         assertTrue(plan.hasOfficialSettingsHooks());
         assertEquals(2, plan.officialSettingsRequestCount());
@@ -192,25 +97,9 @@ public class HookRequestPlanTest {
 
     @Test
     public void swapControlAndService_requestsSharedHomeHook() {
-        HookRequestPlan plan = HookRequestPlan.fromConfig(
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                true,
-                false,
-                false,
-                false,
-                false,
-                false
-        );
+        Flags flags = new Flags();
+        flags.swapControlServiceNav = true;
+        HookRequestPlan plan = flags.build();
 
         assertTrue(plan.hasHomeActivityHooks());
         assertEquals(1, plan.homeActivityRequestCount());
@@ -219,25 +108,9 @@ public class HookRequestPlanTest {
 
     @Test
     public void fastStartup_countsDeferredSdkHooks() {
-        HookRequestPlan plan = HookRequestPlan.fromConfig(
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                true,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false
-        );
+        Flags flags = new Flags();
+        flags.fastStartup = true;
+        HookRequestPlan plan = flags.build();
 
         assertTrue(plan.hasFastStartupHooks());
         assertEquals(5, plan.fastStartupRequestCount());
@@ -246,28 +119,100 @@ public class HookRequestPlanTest {
 
     @Test
     public void bleReconnect_requestsHomeResumeHook() {
-        HookRequestPlan plan = HookRequestPlan.fromConfig(
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                true,
-                false
-        );
+        Flags flags = new Flags();
+        flags.bleReconnect = true;
+        HookRequestPlan plan = flags.build();
 
         assertTrue(plan.hasHomeActivityHooks());
         assertEquals(1, plan.homeActivityRequestCount());
         assertEquals(1, plan.totalRequestCount());
+    }
+
+    @Test
+    public void batteryAndSound_shareTBoxListHook() {
+        Flags flags = new Flags();
+        flags.showBatteryDynamicsEntry = true;
+        flags.showCustomVehicleSound = true;
+        HookRequestPlan plan = flags.build();
+
+        assertTrue(plan.hasHiddenFeatureHooks());
+        assertEquals(1, plan.hiddenFeatureRequestCount());
+        assertEquals(1, plan.totalRequestCount());
+    }
+
+    private static final class Flags {
+        boolean hookSetupView;
+        boolean hookCountDown;
+        boolean hookConfigBean;
+        boolean forceEmptyRes;
+        boolean forceDurationZero;
+        boolean forceEmptyBanner;
+        boolean hookAppUpdate;
+        boolean fastStartup;
+        boolean blockUsageReport;
+        boolean blockBugly;
+        boolean simplifyHomeNav;
+        boolean swapControlServiceNav;
+        boolean enableVehicleDiagnostics;
+        boolean enableTrackExport;
+        boolean enableMonthlyRideData;
+        boolean showBrakeForceData;
+        boolean showBatteryDynamicsEntry;
+        boolean showCustomVehicleSound;
+        boolean overrideProximityDistance;
+        boolean bleReconnect;
+        boolean showOfficialSettingsEntry;
+
+        static Flags allEnabled() {
+            Flags flags = new Flags();
+            flags.hookSetupView = true;
+            flags.hookCountDown = true;
+            flags.hookConfigBean = true;
+            flags.forceEmptyRes = true;
+            flags.forceDurationZero = true;
+            flags.forceEmptyBanner = true;
+            flags.hookAppUpdate = true;
+            flags.fastStartup = true;
+            flags.blockUsageReport = true;
+            flags.blockBugly = true;
+            flags.simplifyHomeNav = true;
+            flags.swapControlServiceNav = true;
+            flags.enableVehicleDiagnostics = true;
+            flags.enableTrackExport = true;
+            flags.enableMonthlyRideData = true;
+            flags.showBrakeForceData = true;
+            flags.showBatteryDynamicsEntry = true;
+            flags.showCustomVehicleSound = true;
+            flags.overrideProximityDistance = true;
+            flags.bleReconnect = true;
+            flags.showOfficialSettingsEntry = true;
+            return flags;
+        }
+
+        HookRequestPlan build() {
+            return HookRequestPlan.fromConfig(
+                    hookSetupView,
+                    hookCountDown,
+                    hookConfigBean,
+                    forceEmptyRes,
+                    forceDurationZero,
+                    forceEmptyBanner,
+                    hookAppUpdate,
+                    fastStartup,
+                    blockUsageReport,
+                    blockBugly,
+                    simplifyHomeNav,
+                    swapControlServiceNav,
+                    enableVehicleDiagnostics,
+                    enableTrackExport,
+                    enableMonthlyRideData,
+                    showBrakeForceData,
+                    showBatteryDynamicsEntry,
+                    showCustomVehicleSound,
+                    overrideProximityDistance,
+                    bleReconnect,
+                    showOfficialSettingsEntry
+            );
+        }
     }
 }

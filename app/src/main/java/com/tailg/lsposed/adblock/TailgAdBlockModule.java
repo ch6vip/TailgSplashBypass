@@ -46,12 +46,20 @@ public class TailgAdBlockModule extends XposedModule {
     private static final String X5_WEBVIEW = "com.tencent.smtt.sdk.WebView";
     private static final String TRACK_DETAIL_ACTIVITY =
             "com.tailg.run.intelligence.model.mine_historical_track.activity.TrackDetailActivity";
+    private static final String HOME_FUNCTION_FRAGMENT =
+            "com.whbluestar.thinkride.ft.home.function.HomeFragment";
+    private static final String DEVICE_FUNCTION = "com.thinkerride.data.DeviceFunction";
+    private static final String AI_RIDING_RECORD_LIST_ACTIVITY =
+            "com.whbluestar.thinkride.ft.record.AIRidingRecordListActivity";
+    private static final String TBOX_SET_ACTIVITY =
+            "com.whbluestar.thinkride.ft.tbox.set.TBoxSetActivity";
     private static final String CAR_CONTROL_INFO_BEAN =
             "com.tailg.run.intelligence.model.home.bean.CarControlInfoBean";
     private static final String SETTING_REVISION_FRAGMENT =
             "com.tailg.run.intelligence.model.mine_setting.fragment.SettingRevisionFragment";
     private static final String LEGACY_SETTING_ACTIVITY =
             "com.tailg.run.intelligence.model.mine_setting.activity.SettingActivity";
+    private static final ThreadLocal<Boolean> MONTHLY_RIDE_ENTRY_SCOPE = new ThreadLocal<>();
 
     private final AtomicBoolean initializationScheduled = new AtomicBoolean(false);
     @Override
@@ -203,6 +211,10 @@ public class TailgAdBlockModule extends XposedModule {
                 config.swapControlServiceNav,
                 config.enableVehicleDiagnostics,
                 config.enableTrackExport,
+                config.enableMonthlyRideData,
+                config.showBrakeForceData,
+                config.showBatteryDynamicsEntry,
+                config.showCustomVehicleSound,
                 config.overrideProximityDistance,
                 config.bleReconnect,
                 config.showOfficialSettingsEntry
@@ -265,6 +277,9 @@ public class TailgAdBlockModule extends XposedModule {
                         requestPlan.trackExportRequestCount(),
                         report
                 );
+            }
+            if (requestPlan.hasHiddenFeatureHooks()) {
+                installHiddenFeatureHooks(classLoader, config, report);
             }
             if (requestPlan.hasProximityHooks()) {
                 installProximityHooks(
@@ -716,6 +731,191 @@ public class TailgAdBlockModule extends XposedModule {
         }
     }
 
+    private void installHiddenFeatureHooks(
+            ClassLoader classLoader,
+            ModuleConfig config,
+            HookInstallReport report
+    ) {
+        if (config.enableMonthlyRideData) {
+            installMonthlyRideDataHooks(classLoader, config.verboseLog, report);
+        }
+        if (config.showBrakeForceData) {
+            installBrakeForceDataHook(classLoader, config.verboseLog, report);
+        }
+        if (config.showBatteryDynamicsEntry || config.showCustomVehicleSound) {
+            installTBoxFeatureEntryHook(classLoader, config, report);
+        }
+    }
+
+    private void installMonthlyRideDataHooks(
+            ClassLoader classLoader,
+            boolean verboseLog,
+            HookInstallReport report
+    ) {
+        Class<?> homeFragment = tryLoadClass(
+                classLoader,
+                HOME_FUNCTION_FRAGMENT,
+                "HomeFragment",
+                1,
+                report
+        );
+        Class<?> deviceFunction = tryLoadClass(
+                classLoader,
+                DEVICE_FUNCTION,
+                "DeviceFunction",
+                1,
+                report
+        );
+        if (homeFragment == null || deviceFunction == null) {
+            if (homeFragment != null || deviceFunction != null) {
+                report.markSkipped();
+            }
+            return;
+        }
+
+        Method openMonthly = findNoArgMethod(homeFragment, "V");
+        Method getMonthAnalysis = findNoArgMethod(deviceFunction, "getMonthAnalysis");
+        boolean openMonthlyValid = openMonthly != null
+                && openMonthly.getReturnType() == Void.TYPE
+                && !Modifier.isStatic(openMonthly.getModifiers());
+        boolean capabilityValid = getMonthAnalysis != null
+                && getMonthAnalysis.getReturnType() == Boolean.TYPE
+                && !Modifier.isStatic(getMonthAnalysis.getModifiers());
+        if (!openMonthlyValid || !capabilityValid) {
+            report.markSkipped();
+            report.markSkipped();
+            return;
+        }
+
+        try {
+            hook(openMonthly)
+                    .setPriority(PRIORITY_HIGHEST)
+                    .setExceptionMode(ExceptionMode.PROTECTIVE)
+                    .intercept(chain -> {
+                        Boolean previous = MONTHLY_RIDE_ENTRY_SCOPE.get();
+                        MONTHLY_RIDE_ENTRY_SCOPE.set(Boolean.TRUE);
+                        try {
+                            return chain.proceed();
+                        } finally {
+                            if (previous == null) {
+                                MONTHLY_RIDE_ENTRY_SCOPE.remove();
+                            } else {
+                                MONTHLY_RIDE_ENTRY_SCOPE.set(previous);
+                            }
+                        }
+                    });
+            report.markInstalled();
+        } catch (Throwable error) {
+            report.markFailed();
+            log(Log.ERROR, TAG, "Install monthly ride entry scope hook failed", error);
+        }
+
+        try {
+            hook(getMonthAnalysis)
+                    .setPriority(PRIORITY_HIGHEST)
+                    .setExceptionMode(ExceptionMode.PROTECTIVE)
+                    .intercept(chain -> Boolean.TRUE.equals(MONTHLY_RIDE_ENTRY_SCOPE.get())
+                            ? Boolean.TRUE
+                            : chain.proceed());
+            report.markInstalled();
+            if (verboseLog) {
+                log(Log.INFO, TAG, "Enabled scoped monthly ride data entry");
+            }
+        } catch (Throwable error) {
+            report.markFailed();
+            log(Log.ERROR, TAG, "Install monthly ride capability hook failed", error);
+        }
+    }
+
+    private void installBrakeForceDataHook(
+            ClassLoader classLoader,
+            boolean verboseLog,
+            HookInstallReport report
+    ) {
+        Class<?> recordList = tryLoadClass(
+                classLoader,
+                AI_RIDING_RECORD_LIST_ACTIVITY,
+                "AIRidingRecordListActivity",
+                1,
+                report
+        );
+        if (recordList == null) {
+            return;
+        }
+        Method loadRecords = findMethod(recordList, "f", boolean.class);
+        if (loadRecords == null || loadRecords.getReturnType() != Void.TYPE
+                || Modifier.isStatic(loadRecords.getModifiers())) {
+            report.markSkipped();
+            return;
+        }
+        try {
+            hook(loadRecords)
+                    .setPriority(PRIORITY_HIGHEST)
+                    .setExceptionMode(ExceptionMode.PROTECTIVE)
+                    .intercept(chain -> {
+                        Object result = chain.proceed();
+                        try {
+                            ReflectionAccess.setField(chain.getThisObject(), "o", true);
+                        } catch (Throwable error) {
+                            log(Log.WARN, TAG, "Set riding-record brake-force flag failed", error);
+                        }
+                        return result;
+                    });
+            report.markInstalled();
+            if (verboseLog) {
+                log(Log.INFO, TAG, "Enabled riding-record brake-force detail flag");
+            }
+        } catch (Throwable error) {
+            report.markFailed();
+            log(Log.ERROR, TAG, "Install brake-force data hook failed", error);
+        }
+    }
+
+    private void installTBoxFeatureEntryHook(
+            ClassLoader classLoader,
+            ModuleConfig config,
+            HookInstallReport report
+    ) {
+        Class<?> tboxSettings = tryLoadClass(
+                classLoader,
+                TBOX_SET_ACTIVITY,
+                "TBoxSetActivity",
+                1,
+                report
+        );
+        if (tboxSettings == null) {
+            return;
+        }
+        Method buildList = findNoArgMethod(tboxSettings, "k");
+        if (buildList == null || buildList.getReturnType() != Void.TYPE
+                || Modifier.isStatic(buildList.getModifiers())) {
+            report.markSkipped();
+            return;
+        }
+        try {
+            hook(buildList)
+                    .setPriority(PRIORITY_HIGHEST)
+                    .setExceptionMode(ExceptionMode.PROTECTIVE)
+                    .intercept(chain -> {
+                        Object result = chain.proceed();
+                        OfficialFeatureEntryController.addTBoxEntries(
+                                chain.getThisObject(),
+                                classLoader,
+                                config.showBatteryDynamicsEntry,
+                                config.showCustomVehicleSound
+                        );
+                        return result;
+                    });
+            report.markInstalled();
+            if (config.verboseLog) {
+                log(Log.INFO, TAG, "Enabled TBox hidden-feature entries");
+            }
+        } catch (Throwable error) {
+            report.markFailed();
+            log(Log.ERROR, TAG, "Install TBox feature-entry hook failed", error);
+        }
+    }
+
     private void installProximityHooks(
             ClassLoader classLoader,
             ModuleConfig config,
@@ -1057,6 +1257,22 @@ public class TailgAdBlockModule extends XposedModule {
                     prefs.getBoolean(ConfigKeys.KEY_ENABLE_TRACK_EXPORT, defaults.enableTrackExport),
                     prefs.getBoolean(ConfigKeys.KEY_TRIM_TRACK_ENDPOINTS, defaults.trimTrackEndpoints),
                     prefs.getBoolean(
+                            ConfigKeys.KEY_ENABLE_MONTHLY_RIDE_DATA,
+                            defaults.enableMonthlyRideData
+                    ),
+                    prefs.getBoolean(
+                            ConfigKeys.KEY_SHOW_BRAKE_FORCE_DATA,
+                            defaults.showBrakeForceData
+                    ),
+                    prefs.getBoolean(
+                            ConfigKeys.KEY_SHOW_BATTERY_DYNAMICS_ENTRY,
+                            defaults.showBatteryDynamicsEntry
+                    ),
+                    prefs.getBoolean(
+                            ConfigKeys.KEY_SHOW_CUSTOM_VEHICLE_SOUND,
+                            defaults.showCustomVehicleSound
+                    ),
+                    prefs.getBoolean(
                             ConfigKeys.KEY_ENABLE_VEHICLE_DIAGNOSTICS,
                             defaults.enableVehicleDiagnostics
                     ),
@@ -1137,6 +1353,10 @@ public class TailgAdBlockModule extends XposedModule {
         final boolean swapControlServiceNav;
         final boolean enableTrackExport;
         final boolean trimTrackEndpoints;
+        final boolean enableMonthlyRideData;
+        final boolean showBrakeForceData;
+        final boolean showBatteryDynamicsEntry;
+        final boolean showCustomVehicleSound;
         final boolean enableVehicleDiagnostics;
         final boolean overrideProximityDistance;
         final boolean showOfficialSettingsEntry;
@@ -1164,6 +1384,10 @@ public class TailgAdBlockModule extends XposedModule {
                 boolean swapControlServiceNav,
                 boolean enableTrackExport,
                 boolean trimTrackEndpoints,
+                boolean enableMonthlyRideData,
+                boolean showBrakeForceData,
+                boolean showBatteryDynamicsEntry,
+                boolean showCustomVehicleSound,
                 boolean enableVehicleDiagnostics,
                 boolean overrideProximityDistance,
                 boolean showOfficialSettingsEntry,
@@ -1190,6 +1414,10 @@ public class TailgAdBlockModule extends XposedModule {
             this.swapControlServiceNav = swapControlServiceNav;
             this.enableTrackExport = enableTrackExport;
             this.trimTrackEndpoints = trimTrackEndpoints;
+            this.enableMonthlyRideData = enableMonthlyRideData;
+            this.showBrakeForceData = showBrakeForceData;
+            this.showBatteryDynamicsEntry = showBatteryDynamicsEntry;
+            this.showCustomVehicleSound = showCustomVehicleSound;
             this.enableVehicleDiagnostics = enableVehicleDiagnostics;
             this.overrideProximityDistance = overrideProximityDistance;
             this.showOfficialSettingsEntry = showOfficialSettingsEntry;
@@ -1219,6 +1447,10 @@ public class TailgAdBlockModule extends XposedModule {
                     ConfigKeys.DEFAULT_SWAP_CONTROL_SERVICE_NAV,
                     ConfigKeys.DEFAULT_ENABLE_TRACK_EXPORT,
                     ConfigKeys.DEFAULT_TRIM_TRACK_ENDPOINTS,
+                    ConfigKeys.DEFAULT_ENABLE_MONTHLY_RIDE_DATA,
+                    ConfigKeys.DEFAULT_SHOW_BRAKE_FORCE_DATA,
+                    ConfigKeys.DEFAULT_SHOW_BATTERY_DYNAMICS_ENTRY,
+                    ConfigKeys.DEFAULT_SHOW_CUSTOM_VEHICLE_SOUND,
                     ConfigKeys.DEFAULT_ENABLE_VEHICLE_DIAGNOSTICS,
                     ConfigKeys.DEFAULT_OVERRIDE_PROXIMITY_DISTANCE,
                     ConfigKeys.DEFAULT_SHOW_OFFICIAL_SETTINGS_ENTRY,
