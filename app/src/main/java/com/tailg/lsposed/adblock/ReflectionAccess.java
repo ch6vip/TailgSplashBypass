@@ -17,6 +17,16 @@ final class ReflectionAccess {
         return field.get(target);
     }
 
+    static void setField(Object target, String name, Object value)
+            throws ReflectiveOperationException {
+        if (target == null) {
+            throw new IllegalArgumentException("target == null");
+        }
+        Field field = findField(target.getClass(), name);
+        field.setAccessible(true);
+        field.set(target, value);
+    }
+
     static Object invokeNoArg(Object target, String name) throws ReflectiveOperationException {
         if (target == null) {
             throw new IllegalArgumentException("target == null");
