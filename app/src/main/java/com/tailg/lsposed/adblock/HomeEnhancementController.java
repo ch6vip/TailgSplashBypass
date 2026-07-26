@@ -8,6 +8,7 @@ import android.content.Context;
 import android.graphics.Typeface;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -28,6 +29,7 @@ final class HomeEnhancementController {
             Activity activity,
             ClassLoader targetClassLoader,
             boolean simplifyNavigation,
+            boolean swapControlAndService,
             boolean enableDiagnostics,
             boolean proximityOverrideEnabled,
             float unlockMeters,
@@ -38,6 +40,9 @@ final class HomeEnhancementController {
             if (simplifyNavigation) {
                 hideBindingView(binding, "rbCircle");
                 hideBindingView(binding, "rbShop");
+            }
+            if (swapControlAndService) {
+                swapControlAndServiceViews(binding);
             }
             if (enableDiagnostics) {
                 Object controlObject = ReflectionAccess.getField(binding, "rbControl");
@@ -65,6 +70,45 @@ final class HomeEnhancementController {
         if (value instanceof View view) {
             view.setVisibility(View.GONE);
         }
+    }
+
+    private static void swapControlAndServiceViews(Object binding)
+            throws ReflectiveOperationException {
+        Object navigationObject = ReflectionAccess.getField(binding, "rgNav");
+        Object controlObject = ReflectionAccess.getField(binding, "rbControl");
+        Object controlUnavailableObject = ReflectionAccess.getField(binding, "rbControlUn");
+        Object serviceObject = ReflectionAccess.getField(binding, "rbService");
+        if (!(navigationObject instanceof ViewGroup navigation)
+                || !(controlObject instanceof View control)
+                || !(controlUnavailableObject instanceof View controlUnavailable)
+                || !(serviceObject instanceof View service)
+                || control.getParent() != navigation
+                || controlUnavailable.getParent() != navigation
+                || service.getParent() != navigation) {
+            return;
+        }
+
+        int controlIndex = navigation.indexOfChild(control);
+        int unavailableIndex = navigation.indexOfChild(controlUnavailable);
+        int serviceIndex = navigation.indexOfChild(service);
+        if (controlIndex < 0 || unavailableIndex < 0 || serviceIndex < 0
+                || unavailableIndex != controlIndex + 1
+                || serviceIndex != unavailableIndex + 1) {
+            return;
+        }
+
+        ViewGroup.LayoutParams controlParams = control.getLayoutParams();
+        ViewGroup.LayoutParams unavailableParams = controlUnavailable.getLayoutParams();
+        ViewGroup.LayoutParams serviceParams = service.getLayoutParams();
+        int insertionIndex = controlIndex;
+
+        // The two car buttons are mutually exclusive states of one navigation slot.
+        navigation.removeView(service);
+        navigation.removeView(controlUnavailable);
+        navigation.removeView(control);
+        navigation.addView(service, insertionIndex, serviceParams);
+        navigation.addView(control, insertionIndex + 1, controlParams);
+        navigation.addView(controlUnavailable, insertionIndex + 2, unavailableParams);
     }
 
     private static void showDiagnostics(

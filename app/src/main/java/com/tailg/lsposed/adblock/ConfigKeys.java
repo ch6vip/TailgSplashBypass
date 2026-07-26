@@ -15,6 +15,7 @@ final class ConfigKeys {
     static final String KEY_BLOCK_USAGE_REPORT = "block_usage_report";
     static final String KEY_BLOCK_BUGLY = "block_bugly";
     static final String KEY_SIMPLIFY_HOME_NAV = "simplify_home_nav";
+    static final String KEY_SWAP_CONTROL_SERVICE_NAV = "swap_control_service_nav";
     static final String KEY_ENABLE_TRACK_EXPORT = "enable_track_export";
     static final String KEY_TRIM_TRACK_ENDPOINTS = "trim_track_endpoints";
     static final String KEY_ENABLE_VEHICLE_DIAGNOSTICS = "enable_vehicle_diagnostics";
@@ -36,6 +37,7 @@ final class ConfigKeys {
     static final boolean DEFAULT_BLOCK_USAGE_REPORT = true;
     static final boolean DEFAULT_BLOCK_BUGLY = false;
     static final boolean DEFAULT_SIMPLIFY_HOME_NAV = false;
+    static final boolean DEFAULT_SWAP_CONTROL_SERVICE_NAV = false;
     static final boolean DEFAULT_ENABLE_TRACK_EXPORT = true;
     static final boolean DEFAULT_TRIM_TRACK_ENDPOINTS = true;
     static final boolean DEFAULT_ENABLE_VEHICLE_DIAGNOSTICS = true;
@@ -58,6 +60,7 @@ final class ConfigKeys {
             KEY_BLOCK_USAGE_REPORT,
             KEY_BLOCK_BUGLY,
             KEY_SIMPLIFY_HOME_NAV,
+            KEY_SWAP_CONTROL_SERVICE_NAV,
             KEY_ENABLE_TRACK_EXPORT,
             KEY_TRIM_TRACK_ENDPOINTS,
             KEY_ENABLE_VEHICLE_DIAGNOSTICS,
@@ -102,6 +105,8 @@ final class ConfigKeys {
                 return DEFAULT_BLOCK_BUGLY;
             case KEY_SIMPLIFY_HOME_NAV:
                 return DEFAULT_SIMPLIFY_HOME_NAV;
+            case KEY_SWAP_CONTROL_SERVICE_NAV:
+                return DEFAULT_SWAP_CONTROL_SERVICE_NAV;
             case KEY_ENABLE_TRACK_EXPORT:
                 return DEFAULT_ENABLE_TRACK_EXPORT;
             case KEY_TRIM_TRACK_ENDPOINTS:

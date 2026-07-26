@@ -41,6 +41,7 @@ final class HookRequestPlan {
             boolean blockUsageReport,
             boolean blockBugly,
             boolean simplifyHomeNav,
+            boolean swapControlServiceNav,
             boolean enableVehicleDiagnostics,
             boolean enableTrackExport,
             boolean overrideProximityDistance,
@@ -75,7 +76,7 @@ final class HookRequestPlan {
 
         int repository = blockUsageReport ? 1 : 0;
         int homeActivity = (blockBugly ? 1 : 0)
-                + (simplifyHomeNav || enableVehicleDiagnostics ? 1 : 0);
+                + (simplifyHomeNav || swapControlServiceNav || enableVehicleDiagnostics ? 1 : 0);
         int trackExport = enableTrackExport ? 1 : 0;
         int proximity = overrideProximityDistance ? 2 : 0;
         int officialSettings = showOfficialSettingsEntry ? 2 : 0;

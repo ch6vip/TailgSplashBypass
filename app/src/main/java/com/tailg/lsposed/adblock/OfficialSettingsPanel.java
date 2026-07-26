@@ -132,7 +132,7 @@ final class OfficialSettingsPanel {
         ScrollView scroll = new ScrollView(activity);
         scroll.setFillViewport(true);
         scroll.setClipToPadding(false);
-        scroll.setScrollbarStyle(View.SCROLLBARS_INSIDE_INSET);
+        scroll.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
 
         LinearLayout content = new LinearLayout(activity);
         content.setOrientation(LinearLayout.VERTICAL);
@@ -627,6 +627,9 @@ final class OfficialSettingsPanel {
         add(result, ConfigKeys.KEY_SIMPLIFY_HOME_NAV, "精简首页导航",
                 "隐藏圈子和商城", ConfigKeys.DEFAULT_SIMPLIFY_HOME_NAV,
                 Group.HOME, null);
+        add(result, ConfigKeys.KEY_SWAP_CONTROL_SERVICE_NAV, "爱车与服务互换位置",
+                "将服务移到爱车前，点击功能保持不变",
+                ConfigKeys.DEFAULT_SWAP_CONTROL_SERVICE_NAV, Group.HOME, null);
         add(result, ConfigKeys.KEY_ENABLE_VEHICLE_DIAGNOSTICS, "车辆能力诊断",
                 "长按爱车打开脱敏诊断", ConfigKeys.DEFAULT_ENABLE_VEHICLE_DIAGNOSTICS,
                 Group.HOME, null);

@@ -193,6 +193,7 @@ public class TailgAdBlockModule extends XposedModule {
                 config.blockUsageReport,
                 config.blockBugly,
                 config.simplifyHomeNav,
+                config.swapControlServiceNav,
                 config.enableVehicleDiagnostics,
                 config.enableTrackExport,
                 config.overrideProximityDistance,
@@ -421,7 +422,9 @@ public class TailgAdBlockModule extends XposedModule {
         if (config.blockBugly) {
             installVoidBlockHook(homeClass, "initTencentBugly", config.verboseLog, report);
         }
-        if (config.simplifyHomeNav || config.enableVehicleDiagnostics) {
+        if (config.simplifyHomeNav
+                || config.swapControlServiceNav
+                || config.enableVehicleDiagnostics) {
             Method setupFragment = findNoArgMethod(homeClass, "setupFragment");
             if (setupFragment == null || setupFragment.getReturnType() != Void.TYPE) {
                 report.markSkipped();
@@ -439,6 +442,7 @@ public class TailgAdBlockModule extends XposedModule {
                                         activity,
                                         classLoader,
                                         config.simplifyHomeNav,
+                                        config.swapControlServiceNav,
                                         config.enableVehicleDiagnostics,
                                         config.overrideProximityDistance,
                                         config.proximityUnlockMeters,
@@ -807,6 +811,10 @@ public class TailgAdBlockModule extends XposedModule {
                     prefs.getBoolean(ConfigKeys.KEY_BLOCK_USAGE_REPORT, defaults.blockUsageReport),
                     prefs.getBoolean(ConfigKeys.KEY_BLOCK_BUGLY, defaults.blockBugly),
                     prefs.getBoolean(ConfigKeys.KEY_SIMPLIFY_HOME_NAV, defaults.simplifyHomeNav),
+                    prefs.getBoolean(
+                            ConfigKeys.KEY_SWAP_CONTROL_SERVICE_NAV,
+                            defaults.swapControlServiceNav
+                    ),
                     prefs.getBoolean(ConfigKeys.KEY_ENABLE_TRACK_EXPORT, defaults.enableTrackExport),
                     prefs.getBoolean(ConfigKeys.KEY_TRIM_TRACK_ENDPOINTS, defaults.trimTrackEndpoints),
                     prefs.getBoolean(
@@ -883,6 +891,7 @@ public class TailgAdBlockModule extends XposedModule {
         final boolean blockUsageReport;
         final boolean blockBugly;
         final boolean simplifyHomeNav;
+        final boolean swapControlServiceNav;
         final boolean enableTrackExport;
         final boolean trimTrackEndpoints;
         final boolean enableVehicleDiagnostics;
@@ -905,6 +914,7 @@ public class TailgAdBlockModule extends XposedModule {
                 boolean blockUsageReport,
                 boolean blockBugly,
                 boolean simplifyHomeNav,
+                boolean swapControlServiceNav,
                 boolean enableTrackExport,
                 boolean trimTrackEndpoints,
                 boolean enableVehicleDiagnostics,
@@ -926,6 +936,7 @@ public class TailgAdBlockModule extends XposedModule {
             this.blockUsageReport = blockUsageReport;
             this.blockBugly = blockBugly;
             this.simplifyHomeNav = simplifyHomeNav;
+            this.swapControlServiceNav = swapControlServiceNav;
             this.enableTrackExport = enableTrackExport;
             this.trimTrackEndpoints = trimTrackEndpoints;
             this.enableVehicleDiagnostics = enableVehicleDiagnostics;
@@ -950,6 +961,7 @@ public class TailgAdBlockModule extends XposedModule {
                     ConfigKeys.DEFAULT_BLOCK_USAGE_REPORT,
                     ConfigKeys.DEFAULT_BLOCK_BUGLY,
                     ConfigKeys.DEFAULT_SIMPLIFY_HOME_NAV,
+                    ConfigKeys.DEFAULT_SWAP_CONTROL_SERVICE_NAV,
                     ConfigKeys.DEFAULT_ENABLE_TRACK_EXPORT,
                     ConfigKeys.DEFAULT_TRIM_TRACK_ENDPOINTS,
                     ConfigKeys.DEFAULT_ENABLE_VEHICLE_DIAGNOSTICS,

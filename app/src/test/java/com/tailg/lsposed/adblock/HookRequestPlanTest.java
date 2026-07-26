@@ -23,6 +23,7 @@ public class HookRequestPlanTest {
                 true,
                 true,
                 true,
+                true,
                 true
         );
 
@@ -58,6 +59,7 @@ public class HookRequestPlanTest {
                 false,
                 false,
                 false,
+                false,
                 false
         );
 
@@ -79,6 +81,7 @@ public class HookRequestPlanTest {
                 false,
                 false,
                 true,
+                false,
                 false,
                 false,
                 false,
@@ -112,6 +115,7 @@ public class HookRequestPlanTest {
                 false,
                 false,
                 false,
+                false,
                 false
         );
 
@@ -125,6 +129,7 @@ public class HookRequestPlanTest {
     @Test
     public void allDisabled_hasZeroRequests() {
         HookRequestPlan plan = HookRequestPlan.fromConfig(
+                false,
                 false,
                 false,
                 false,
@@ -163,11 +168,37 @@ public class HookRequestPlanTest {
                 false,
                 false,
                 false,
+                false,
                 true
         );
 
         assertTrue(plan.hasOfficialSettingsHooks());
         assertEquals(2, plan.officialSettingsRequestCount());
         assertEquals(2, plan.totalRequestCount());
+    }
+
+    @Test
+    public void swapControlAndService_requestsSharedHomeHook() {
+        HookRequestPlan plan = HookRequestPlan.fromConfig(
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false
+        );
+
+        assertTrue(plan.hasHomeActivityHooks());
+        assertEquals(1, plan.homeActivityRequestCount());
+        assertEquals(1, plan.totalRequestCount());
     }
 }
