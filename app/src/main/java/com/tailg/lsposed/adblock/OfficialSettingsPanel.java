@@ -266,6 +266,10 @@ final class OfficialSettingsPanel {
             }
             section.addView(createToggleRow(groupSpecs.get(index)));
         }
+        if (group == Group.HIDDEN) {
+            section.addView(createDivider(dp(16)));
+            section.addView(createBatteryInfoActionRow());
+        }
         if (group == Group.PROXIMITY) {
             section.addView(createDivider(dp(16)));
             unlockRow = createDistanceRow(true);
@@ -354,6 +358,63 @@ final class OfficialSettingsPanel {
 
         switches.put(spec.key, toggle);
         rows.put(spec.key, row);
+        return row;
+    }
+
+    private View createBatteryInfoActionRow() {
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setMinimumHeight(dp(72));
+        row.setPadding(dp(16), dp(10), dp(14), dp(10));
+        row.setBackground(rowRippleBackground());
+
+        LinearLayout labels = new LinearLayout(activity);
+        labels.setOrientation(LinearLayout.VERTICAL);
+
+        TextView title = new TextView(activity);
+        title.setText("电池信息");
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16.0f);
+        title.setTextColor(palette.onSurface);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        title.setLetterSpacing(0.0f);
+        title.setMaxLines(2);
+        labels.addView(title);
+
+        TextView description = new TextView(activity);
+        description.setText("按当前车型打开官方电池信息页");
+        description.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.0f);
+        description.setTextColor(palette.onSurfaceVariant);
+        description.setLetterSpacing(0.0f);
+        description.setMaxLines(3);
+        LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        descriptionParams.topMargin = dp(2);
+        labels.addView(description, descriptionParams);
+
+        LinearLayout.LayoutParams labelsParams = new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1.0f
+        );
+        labelsParams.rightMargin = dp(16);
+        row.addView(labels, labelsParams);
+
+        TextView arrow = new TextView(activity);
+        arrow.setText("›");
+        arrow.setTextSize(TypedValue.COMPLEX_UNIT_SP, 30.0f);
+        arrow.setTextColor(palette.onSurfaceVariant);
+        arrow.setGravity(Gravity.CENTER);
+        arrow.setLetterSpacing(0.0f);
+        row.addView(arrow, new LinearLayout.LayoutParams(dp(32), dp(48)));
+
+        row.setContentDescription("电池信息");
+        row.setOnClickListener(view -> BatteryInfoShortcutController.open(
+                activity,
+                activity.getClassLoader()
+        ));
         return row;
     }
 
@@ -849,9 +910,6 @@ final class OfficialSettingsPanel {
         add(result, ConfigKeys.KEY_SHOW_BATTERY_DYNAMICS_ENTRY, "电池动态页面入口",
                 "在主车设置中补充官方电池历史页",
                 ConfigKeys.DEFAULT_SHOW_BATTERY_DYNAMICS_ENTRY, Group.HIDDEN, null);
-        add(result, ConfigKeys.KEY_SHOW_BATTERY_INFO_SHORTCUT, "电池信息快捷入口",
-                "按当前车型自动打开官方电池信息页",
-                ConfigKeys.DEFAULT_SHOW_BATTERY_INFO_SHORTCUT, Group.HIDDEN, null);
         add(result, ConfigKeys.KEY_SHOW_CUSTOM_VEHICLE_SOUND, "自定义车辆音效",
                 "仅车辆上报支持时补充官方音效入口",
                 ConfigKeys.DEFAULT_SHOW_CUSTOM_VEHICLE_SOUND, Group.HIDDEN, null);

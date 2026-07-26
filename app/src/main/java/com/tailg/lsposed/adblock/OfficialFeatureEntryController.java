@@ -19,8 +19,6 @@ final class OfficialFeatureEntryController {
             "com.qmuiteam.qmui.widget.grouplist.QMUICommonListItemView";
     private static final String BATTERY_TAG =
             "com.tailg.lsposed.adblock:battery_dynamics_entry";
-    private static final String BATTERY_INFO_TAG =
-            "com.tailg.lsposed.adblock:battery_info_shortcut";
     private static final String CUSTOM_SOUND_TAG =
             "com.tailg.lsposed.adblock:custom_sound_entry";
 
@@ -31,7 +29,6 @@ final class OfficialFeatureEntryController {
             Object target,
             ClassLoader classLoader,
             boolean batteryDynamicsEnabled,
-            boolean batteryInfoShortcutEnabled,
             boolean customSoundEnabled
     ) {
         if (!(target instanceof Activity activity)
@@ -41,9 +38,8 @@ final class OfficialFeatureEntryController {
         }
 
         boolean addBattery = shouldAddBattery(target, batteryDynamicsEnabled);
-        boolean addBatteryInfo = shouldAddBatteryInfo(target, batteryInfoShortcutEnabled);
         boolean addCustomSound = shouldAddCustomSound(target, customSoundEnabled);
-        if (!addBattery && !addBatteryInfo && !addCustomSound) {
+        if (!addBattery && !addCustomSound) {
             return;
         }
 
@@ -55,13 +51,10 @@ final class OfficialFeatureEntryController {
             if (addBattery && group.findViewWithTag(BATTERY_TAG) != null) {
                 addBattery = false;
             }
-            if (addBatteryInfo && group.findViewWithTag(BATTERY_INFO_TAG) != null) {
-                addBatteryInfo = false;
-            }
             if (addCustomSound && group.findViewWithTag(CUSTOM_SOUND_TAG) != null) {
                 addCustomSound = false;
             }
-            if (!addBattery && !addBatteryInfo && !addCustomSound) {
+            if (!addBattery && !addCustomSound) {
                 return;
             }
 
@@ -84,20 +77,6 @@ final class OfficialFeatureEntryController {
             createItem.setAccessible(true);
 
             setTitle.invoke(section, "Tailg 工具箱");
-            if (addBatteryInfo) {
-                View row = createRow(
-                        target,
-                        createItem,
-                        resolveString(activity, "BatteryInfo", "电池信息"),
-                        BATTERY_INFO_TAG
-                );
-                addItem.invoke(
-                        section,
-                        row,
-                        (View.OnClickListener) view ->
-                                BatteryInfoShortcutController.open(activity, classLoader)
-                );
-            }
             if (addBattery) {
                 View row = createRow(
                         target,
@@ -172,19 +151,6 @@ final class OfficialFeatureEntryController {
             );
         } catch (Throwable error) {
             Log.w(TAG, "Resolve custom sound entry policy failed", error);
-            return false;
-        }
-    }
-
-    private static boolean shouldAddBatteryInfo(Object target, boolean enabled) {
-        if (!enabled) {
-            return false;
-        }
-        try {
-            boolean isUseCar = Boolean.TRUE.equals(ReflectionAccess.getField(target, "C"));
-            return OfficialFeatureEntryPolicy.shouldAddBatteryInfoShortcut(true, isUseCar);
-        } catch (Throwable error) {
-            Log.w(TAG, "Resolve battery information shortcut policy failed", error);
             return false;
         }
     }

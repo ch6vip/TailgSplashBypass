@@ -22,7 +22,6 @@ final class ConfigKeys {
     static final String KEY_ENABLE_MONTHLY_RIDE_DATA = "enable_monthly_ride_data";
     static final String KEY_SHOW_BRAKE_FORCE_DATA = "show_brake_force_data";
     static final String KEY_SHOW_BATTERY_DYNAMICS_ENTRY = "show_battery_dynamics_entry";
-    static final String KEY_SHOW_BATTERY_INFO_SHORTCUT = "show_battery_info_shortcut";
     static final String KEY_SHOW_CUSTOM_VEHICLE_SOUND = "show_custom_vehicle_sound";
     static final String KEY_ENABLE_VEHICLE_DIAGNOSTICS = "enable_vehicle_diagnostics";
     static final String KEY_OVERRIDE_PROXIMITY_DISTANCE = "override_proximity_distance";
@@ -53,7 +52,6 @@ final class ConfigKeys {
     static final boolean DEFAULT_ENABLE_MONTHLY_RIDE_DATA = false;
     static final boolean DEFAULT_SHOW_BRAKE_FORCE_DATA = false;
     static final boolean DEFAULT_SHOW_BATTERY_DYNAMICS_ENTRY = false;
-    static final boolean DEFAULT_SHOW_BATTERY_INFO_SHORTCUT = false;
     static final boolean DEFAULT_SHOW_CUSTOM_VEHICLE_SOUND = false;
     static final boolean DEFAULT_ENABLE_VEHICLE_DIAGNOSTICS = true;
     static final boolean DEFAULT_OVERRIDE_PROXIMITY_DISTANCE = false;
@@ -85,7 +83,6 @@ final class ConfigKeys {
             KEY_ENABLE_MONTHLY_RIDE_DATA,
             KEY_SHOW_BRAKE_FORCE_DATA,
             KEY_SHOW_BATTERY_DYNAMICS_ENTRY,
-            KEY_SHOW_BATTERY_INFO_SHORTCUT,
             KEY_SHOW_CUSTOM_VEHICLE_SOUND,
             KEY_ENABLE_VEHICLE_DIAGNOSTICS,
             KEY_OVERRIDE_PROXIMITY_DISTANCE,
@@ -144,8 +141,6 @@ final class ConfigKeys {
                 return DEFAULT_SHOW_BRAKE_FORCE_DATA;
             case KEY_SHOW_BATTERY_DYNAMICS_ENTRY:
                 return DEFAULT_SHOW_BATTERY_DYNAMICS_ENTRY;
-            case KEY_SHOW_BATTERY_INFO_SHORTCUT:
-                return DEFAULT_SHOW_BATTERY_INFO_SHORTCUT;
             case KEY_SHOW_CUSTOM_VEHICLE_SOUND:
                 return DEFAULT_SHOW_CUSTOM_VEHICLE_SOUND;
             case KEY_ENABLE_VEHICLE_DIAGNOSTICS:

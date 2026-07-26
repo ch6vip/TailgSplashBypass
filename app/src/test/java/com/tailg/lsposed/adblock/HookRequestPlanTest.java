@@ -129,22 +129,10 @@ public class HookRequestPlanTest {
     }
 
     @Test
-    public void batteryEntriesAndSound_shareTBoxListHook() {
+    public void batteryAndSound_shareTBoxListHook() {
         Flags flags = new Flags();
         flags.showBatteryDynamicsEntry = true;
-        flags.showBatteryInfoShortcut = true;
         flags.showCustomVehicleSound = true;
-        HookRequestPlan plan = flags.build();
-
-        assertTrue(plan.hasHiddenFeatureHooks());
-        assertEquals(1, plan.hiddenFeatureRequestCount());
-        assertEquals(1, plan.totalRequestCount());
-    }
-
-    @Test
-    public void batteryInformationShortcut_requestsTBoxListHookByItself() {
-        Flags flags = new Flags();
-        flags.showBatteryInfoShortcut = true;
         HookRequestPlan plan = flags.build();
 
         assertTrue(plan.hasHiddenFeatureHooks());
@@ -170,7 +158,6 @@ public class HookRequestPlanTest {
         boolean enableMonthlyRideData;
         boolean showBrakeForceData;
         boolean showBatteryDynamicsEntry;
-        boolean showBatteryInfoShortcut;
         boolean showCustomVehicleSound;
         boolean overrideProximityDistance;
         boolean bleReconnect;
@@ -195,7 +182,6 @@ public class HookRequestPlanTest {
             flags.enableMonthlyRideData = true;
             flags.showBrakeForceData = true;
             flags.showBatteryDynamicsEntry = true;
-            flags.showBatteryInfoShortcut = true;
             flags.showCustomVehicleSound = true;
             flags.overrideProximityDistance = true;
             flags.bleReconnect = true;
@@ -222,7 +208,6 @@ public class HookRequestPlanTest {
                     enableMonthlyRideData,
                     showBrakeForceData,
                     showBatteryDynamicsEntry,
-                    showBatteryInfoShortcut,
                     showCustomVehicleSound,
                     overrideProximityDistance,
                     bleReconnect,

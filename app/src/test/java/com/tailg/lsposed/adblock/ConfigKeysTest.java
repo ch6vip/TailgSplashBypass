@@ -40,7 +40,6 @@ public class ConfigKeysTest {
         assertFalse(ConfigKeys.defaultBooleanFor(ConfigKeys.KEY_ENABLE_MONTHLY_RIDE_DATA));
         assertFalse(ConfigKeys.defaultBooleanFor(ConfigKeys.KEY_SHOW_BRAKE_FORCE_DATA));
         assertFalse(ConfigKeys.defaultBooleanFor(ConfigKeys.KEY_SHOW_BATTERY_DYNAMICS_ENTRY));
-        assertFalse(ConfigKeys.defaultBooleanFor(ConfigKeys.KEY_SHOW_BATTERY_INFO_SHORTCUT));
         assertFalse(ConfigKeys.defaultBooleanFor(ConfigKeys.KEY_SHOW_CUSTOM_VEHICLE_SOUND));
         assertEquals(15, ConfigKeys.DEFAULT_BLE_RECONNECT_INTERVAL_SECONDS);
         assertEquals(3, ConfigKeys.DEFAULT_BLE_RECONNECT_MAX_ATTEMPTS);

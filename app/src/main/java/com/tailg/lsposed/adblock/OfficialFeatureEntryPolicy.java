@@ -20,8 +20,4 @@ final class OfficialFeatureEntryPolicy {
     ) {
         return enabled && isBound && customSoundSupported && !entryAlreadyVisible;
     }
-
-    static boolean shouldAddBatteryInfoShortcut(boolean enabled, boolean isUseCar) {
-        return enabled && !isUseCar;
-    }
 }
