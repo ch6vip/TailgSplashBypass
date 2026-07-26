@@ -440,9 +440,14 @@ final class OfficialSettingsPanel {
         LinearLayout choices = new LinearLayout(activity);
         choices.setOrientation(LinearLayout.VERTICAL);
 
+        Switch forceOpen = new Switch(activity);
+        choices.addView(createDivider(dp(16)));
+        choices.addView(createForceOpenRow(forceOpen));
+
         addBatteryChoice(
                 choices,
                 chooser,
+                forceOpen,
                 "自动选择",
                 "按官方车型规则匹配",
                 null
@@ -450,6 +455,7 @@ final class OfficialSettingsPanel {
         addBatteryChoice(
                 choices,
                 chooser,
+                forceOpen,
                 "普通电池信息",
                 "车型 1/2 或 GPS 车辆",
                 BatteryInfoRoutePolicy.Route.NORMAL
@@ -457,6 +463,7 @@ final class OfficialSettingsPanel {
         addBatteryChoice(
                 choices,
                 chooser,
+                forceOpen,
                 "C39 电池信息",
                 "车型 10/14",
                 BatteryInfoRoutePolicy.Route.C39
@@ -464,6 +471,7 @@ final class OfficialSettingsPanel {
         addBatteryChoice(
                 choices,
                 chooser,
+                forceOpen,
                 "TLV 电池信息",
                 "电池类型 160/208",
                 BatteryInfoRoutePolicy.Route.TLV
@@ -471,6 +479,7 @@ final class OfficialSettingsPanel {
         addBatteryChoice(
                 choices,
                 chooser,
+                forceOpen,
                 "BMS 电池信息",
                 "电池类型 176",
                 BatteryInfoRoutePolicy.Route.BMS
@@ -478,6 +487,7 @@ final class OfficialSettingsPanel {
         addBatteryChoice(
                 choices,
                 chooser,
+                forceOpen,
                 "电池动态",
                 "历史电压与温度曲线",
                 BatteryInfoRoutePolicy.Route.DYNAMICS
@@ -546,16 +556,24 @@ final class OfficialSettingsPanel {
     private void addBatteryChoice(
             LinearLayout target,
             Dialog chooser,
+            Switch forceOpen,
             String title,
             String description,
             BatteryInfoRoutePolicy.Route route
     ) {
         target.addView(createDivider(dp(16)));
-        target.addView(createBatteryChoiceRow(chooser, title, description, route));
+        target.addView(createBatteryChoiceRow(
+                chooser,
+                forceOpen,
+                title,
+                description,
+                route
+        ));
     }
 
     private View createBatteryChoiceRow(
             Dialog chooser,
+            Switch forceOpen,
             String titleText,
             String descriptionText,
             BatteryInfoRoutePolicy.Route route
@@ -613,13 +631,68 @@ final class OfficialSettingsPanel {
                     : BatteryInfoShortcutController.open(
                             activity,
                             activity.getClassLoader(),
-                            route
+                            route,
+                            forceOpen.isChecked()
                     );
             if (opened) {
                 chooser.dismiss();
                 dismissSettingsPanel();
             }
         });
+        return row;
+    }
+
+    private View createForceOpenRow(Switch toggle) {
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setMinimumHeight(dp(72));
+        row.setPadding(dp(16), dp(8), dp(14), dp(8));
+        row.setBackground(rowRippleBackground());
+
+        LinearLayout labels = new LinearLayout(activity);
+        labels.setOrientation(LinearLayout.VERTICAL);
+
+        TextView title = new TextView(activity);
+        title.setText("强制打开");
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15.0f);
+        title.setTextColor(palette.onSurface);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        title.setLetterSpacing(0.0f);
+        labels.addView(title);
+
+        TextView description = new TextView(activity);
+        description.setText("跳过兼容校验，页面可能空白或报错");
+        description.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.0f);
+        description.setTextColor(palette.onSurfaceVariant);
+        description.setLetterSpacing(0.0f);
+        description.setMaxLines(2);
+        LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        descriptionParams.topMargin = dp(1);
+        labels.addView(description, descriptionParams);
+
+        LinearLayout.LayoutParams labelsParams = new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1.0f
+        );
+        labelsParams.rightMargin = dp(16);
+        row.addView(labels, labelsParams);
+
+        toggle.setContentDescription("强制打开");
+        toggle.setShowText(false);
+        toggle.setSplitTrack(false);
+        toggle.setSwitchMinWidth(dp(52));
+        toggle.setThumbTextPadding(0);
+        toggle.setThumbTintList(palette.switchThumbColors());
+        toggle.setTrackTintList(palette.switchTrackColors());
+        toggle.setPadding(0, 0, 0, 0);
+        row.addView(toggle, new LinearLayout.LayoutParams(dp(52), dp(48)));
+
+        row.setOnClickListener(view -> toggle.toggle());
         return row;
     }
 

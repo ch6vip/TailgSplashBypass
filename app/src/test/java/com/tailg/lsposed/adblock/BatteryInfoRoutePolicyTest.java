@@ -74,6 +74,16 @@ public class BatteryInfoRoutePolicyTest {
         assertManual(true, BatteryInfoRoutePolicy.Route.DYNAMICS, null, null, null, null);
     }
 
+    @Test
+    public void forceMode_allowsExplicitPagesWithoutFakingVehicleData() {
+        assertForce(true, BatteryInfoRoutePolicy.Route.NORMAL);
+        assertForce(true, BatteryInfoRoutePolicy.Route.C39);
+        assertForce(true, BatteryInfoRoutePolicy.Route.TLV);
+        assertForce(true, BatteryInfoRoutePolicy.Route.BMS);
+        assertForce(true, BatteryInfoRoutePolicy.Route.DYNAMICS);
+        assertForce(false, BatteryInfoRoutePolicy.Route.UNAVAILABLE);
+    }
+
     private static void assertRoute(
             BatteryInfoRoutePolicy.Route expected,
             Integer currentModelType,
@@ -110,6 +120,20 @@ public class BatteryInfoRoutePolicyTest {
                         carModelType,
                         isGps,
                         bmsTlvType
+                )
+        );
+    }
+
+    private static void assertForce(boolean expected, BatteryInfoRoutePolicy.Route route) {
+        assertEquals(
+                expected,
+                BatteryInfoRoutePolicy.canOpenManually(
+                        route,
+                        null,
+                        null,
+                        null,
+                        null,
+                        true
                 )
         );
     }

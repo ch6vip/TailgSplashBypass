@@ -93,6 +93,24 @@ final class BatteryInfoRoutePolicy {
         }
     }
 
+    static boolean canOpenManually(
+            Route route,
+            Integer currentModelType,
+            Integer carModelType,
+            Integer isGps,
+            String bmsTlvType,
+            boolean force
+    ) {
+        return (force && route != Route.UNAVAILABLE)
+                || canOpenManually(
+                        route,
+                        currentModelType,
+                        carModelType,
+                        isGps,
+                        bmsTlvType
+                );
+    }
+
     private static boolean validModelType(Integer modelType) {
         return modelType != null && modelType >= 0;
     }

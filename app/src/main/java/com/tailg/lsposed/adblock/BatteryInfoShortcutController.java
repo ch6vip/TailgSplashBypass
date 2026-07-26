@@ -35,13 +35,22 @@ final class BatteryInfoShortcutController {
     }
 
     static boolean open(Activity activity, ClassLoader classLoader) {
-        return open(activity, classLoader, null);
+        return open(activity, classLoader, null, false);
     }
 
     static boolean open(
             Activity activity,
             ClassLoader classLoader,
             BatteryInfoRoutePolicy.Route requestedRoute
+    ) {
+        return open(activity, classLoader, requestedRoute, false);
+    }
+
+    static boolean open(
+            Activity activity,
+            ClassLoader classLoader,
+            BatteryInfoRoutePolicy.Route requestedRoute,
+            boolean force
     ) {
         try {
             Object car = invokeStaticNoArg(classLoader, PREFS_UTIL, "getCarControlInfo");
@@ -71,7 +80,8 @@ final class BatteryInfoShortcutController {
                     currentModelType,
                     carModelType,
                     isGps,
-                    bmsTlvType
+                    bmsTlvType,
+                    force
             )) {
                 showIncompatible(activity);
                 return false;
@@ -111,7 +121,7 @@ final class BatteryInfoShortcutController {
                     );
                     return true;
                 case DYNAMICS:
-                    return launchBatteryDynamics(activity, classLoader);
+                    return launchBatteryDynamics(activity, classLoader, force);
                 case UNAVAILABLE:
                 default:
                     showUnavailable(activity);
@@ -179,23 +189,26 @@ final class BatteryInfoShortcutController {
 
     private static boolean launchBatteryDynamics(
             Activity activity,
-            ClassLoader classLoader
+            ClassLoader classLoader,
+            boolean force
     ) throws ReflectiveOperationException {
-        Object centerControlAction = invokeStaticNoArg(
-                classLoader,
-                TBOX_COMPONENT,
-                "getCenterControlAction"
-        );
-        String uuid = asString(
-                ReflectionAccess.invokeNoArg(centerControlAction, "getCurrentUUID")
-        );
-        if (uuid == null || uuid.trim().isEmpty()) {
-            Toast.makeText(
-                    activity,
-                    "当前车辆缺少电池动态所需的中控标识",
-                    Toast.LENGTH_SHORT
-            ).show();
-            return false;
+        if (!force) {
+            Object centerControlAction = invokeStaticNoArg(
+                    classLoader,
+                    TBOX_COMPONENT,
+                    "getCenterControlAction"
+            );
+            String uuid = asString(
+                    ReflectionAccess.invokeNoArg(centerControlAction, "getCurrentUUID")
+            );
+            if (uuid == null || uuid.trim().isEmpty()) {
+                Toast.makeText(
+                        activity,
+                        "当前车辆缺少电池动态所需的中控标识",
+                        Toast.LENGTH_SHORT
+                ).show();
+                return false;
+            }
         }
 
         Class<?> activityClass = Class.forName(DYNAMICS_ACTIVITY, false, classLoader);
