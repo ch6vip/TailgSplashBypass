@@ -4,6 +4,7 @@ final class HookRequestPlan {
     private final int splashRequestCount;
     private final int configBeanRequestCount;
     private final int appUpdateRequestCount;
+    private final int fastStartupRequestCount;
     private final int repositoryRequestCount;
     private final int homeActivityRequestCount;
     private final int trackExportRequestCount;
@@ -14,6 +15,7 @@ final class HookRequestPlan {
             int splashRequestCount,
             int configBeanRequestCount,
             int appUpdateRequestCount,
+            int fastStartupRequestCount,
             int repositoryRequestCount,
             int homeActivityRequestCount,
             int trackExportRequestCount,
@@ -23,6 +25,7 @@ final class HookRequestPlan {
         this.splashRequestCount = splashRequestCount;
         this.configBeanRequestCount = configBeanRequestCount;
         this.appUpdateRequestCount = appUpdateRequestCount;
+        this.fastStartupRequestCount = fastStartupRequestCount;
         this.repositoryRequestCount = repositoryRequestCount;
         this.homeActivityRequestCount = homeActivityRequestCount;
         this.trackExportRequestCount = trackExportRequestCount;
@@ -38,6 +41,7 @@ final class HookRequestPlan {
             boolean forceDurationZero,
             boolean forceEmptyBanner,
             boolean hookAppUpdate,
+            boolean fastStartup,
             boolean blockUsageReport,
             boolean blockBugly,
             boolean simplifyHomeNav,
@@ -45,6 +49,7 @@ final class HookRequestPlan {
             boolean enableVehicleDiagnostics,
             boolean enableTrackExport,
             boolean overrideProximityDistance,
+            boolean bleReconnect,
             boolean showOfficialSettingsEntry
     ) {
         int splash = 0;
@@ -74,9 +79,11 @@ final class HookRequestPlan {
             appUpdate += 2; // getIsPop + getIsForce
         }
 
+        int fastStartupHooks = fastStartup ? 5 : 0;
         int repository = blockUsageReport ? 1 : 0;
         int homeActivity = (blockBugly ? 1 : 0)
-                + (simplifyHomeNav || swapControlServiceNav || enableVehicleDiagnostics ? 1 : 0);
+                + (simplifyHomeNav || swapControlServiceNav || enableVehicleDiagnostics ? 1 : 0)
+                + (bleReconnect ? 1 : 0);
         int trackExport = enableTrackExport ? 1 : 0;
         int proximity = overrideProximityDistance ? 2 : 0;
         int officialSettings = showOfficialSettingsEntry ? 2 : 0;
@@ -85,6 +92,7 @@ final class HookRequestPlan {
                 splash,
                 configBean,
                 appUpdate,
+                fastStartupHooks,
                 repository,
                 homeActivity,
                 trackExport,
@@ -103,6 +111,10 @@ final class HookRequestPlan {
 
     boolean hasAppUpdateHooks() {
         return appUpdateRequestCount > 0;
+    }
+
+    boolean hasFastStartupHooks() {
+        return fastStartupRequestCount > 0;
     }
 
     boolean hasRepositoryHooks() {
@@ -137,6 +149,10 @@ final class HookRequestPlan {
         return appUpdateRequestCount;
     }
 
+    int fastStartupRequestCount() {
+        return fastStartupRequestCount;
+    }
+
     int repositoryRequestCount() {
         return repositoryRequestCount;
     }
@@ -161,6 +177,7 @@ final class HookRequestPlan {
         return splashRequestCount
                 + configBeanRequestCount
                 + appUpdateRequestCount
+                + fastStartupRequestCount
                 + repositoryRequestCount
                 + homeActivityRequestCount
                 + trackExportRequestCount

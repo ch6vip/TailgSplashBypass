@@ -24,6 +24,8 @@ public class HookRequestPlanTest {
                 true,
                 true,
                 true,
+                true,
+                true,
                 true
         );
 
@@ -35,12 +37,13 @@ public class HookRequestPlanTest {
         assertEquals(6, plan.configBeanRequestCount());
         // getIsPop + getIsForce
         assertEquals(2, plan.appUpdateRequestCount());
+        assertEquals(5, plan.fastStartupRequestCount());
         assertEquals(1, plan.repositoryRequestCount());
-        assertEquals(2, plan.homeActivityRequestCount());
+        assertEquals(3, plan.homeActivityRequestCount());
         assertEquals(1, plan.trackExportRequestCount());
         assertEquals(2, plan.proximityRequestCount());
         assertEquals(2, plan.officialSettingsRequestCount());
-        assertEquals(18, plan.totalRequestCount());
+        assertEquals(24, plan.totalRequestCount());
     }
 
     @Test
@@ -52,6 +55,8 @@ public class HookRequestPlanTest {
                 true,
                 true,
                 true,
+                false,
+                false,
                 false,
                 false,
                 false,
@@ -89,6 +94,8 @@ public class HookRequestPlanTest {
                 false,
                 false,
                 false,
+                false,
+                false,
                 false
         );
 
@@ -116,6 +123,8 @@ public class HookRequestPlanTest {
                 false,
                 false,
                 false,
+                false,
+                false,
                 false
         );
 
@@ -129,6 +138,8 @@ public class HookRequestPlanTest {
     @Test
     public void allDisabled_hasZeroRequests() {
         HookRequestPlan plan = HookRequestPlan.fromConfig(
+                false,
+                false,
                 false,
                 false,
                 false,
@@ -169,6 +180,8 @@ public class HookRequestPlanTest {
                 false,
                 false,
                 false,
+                false,
+                false,
                 true
         );
 
@@ -190,10 +203,66 @@ public class HookRequestPlanTest {
                 false,
                 false,
                 false,
+                false,
                 true,
                 false,
                 false,
                 false,
+                false,
+                false
+        );
+
+        assertTrue(plan.hasHomeActivityHooks());
+        assertEquals(1, plan.homeActivityRequestCount());
+        assertEquals(1, plan.totalRequestCount());
+    }
+
+    @Test
+    public void fastStartup_countsDeferredSdkHooks() {
+        HookRequestPlan plan = HookRequestPlan.fromConfig(
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+        );
+
+        assertTrue(plan.hasFastStartupHooks());
+        assertEquals(5, plan.fastStartupRequestCount());
+        assertEquals(5, plan.totalRequestCount());
+    }
+
+    @Test
+    public void bleReconnect_requestsHomeResumeHook() {
+        HookRequestPlan plan = HookRequestPlan.fromConfig(
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
                 false
         );
 

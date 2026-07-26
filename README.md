@@ -1,6 +1,6 @@
 # Tailg LSPosed 工具箱
 
-面向台铃官方 App `com.tailg.run.intelligence` 3.5.9 的 LSPosed 模块。模块提供广告清理、隐私控制、轨迹导出、首页精简、车辆能力诊断和感应距离阈值覆盖。
+面向台铃官方 App `com.tailg.run.intelligence` 3.5.9 的 LSPosed 模块。模块提供广告清理、隐私控制、轨迹导出、首页精简、启动优化、蓝牙连接恢复、车辆能力诊断和感应距离阈值覆盖。
 
 ## 功能
 
@@ -34,6 +34,19 @@
 - 模块桌面图标只负责拉起官方 App 内的同一配置面板；即使关闭模块总开关或隐藏官方入口，也可通过桌面图标恢复配置。
 - 配置面板采用 Material Design 3 布局，并跟随官方 App 的明暗模式与主题强调色。
 
+### 启动优化
+
+- 可选跳过首页阶段的腾讯 X5 配置和七鱼客服 SDK 初始化，定位服务、车辆告警推送与首页 BLE 初始化保持不变。
+- 首次创建 X5 WebView 前补做官方原有的 X5 配置；首次真正打开客服前补做七鱼初始化。
+- 仅延迟当前未使用的 SDK，不改写首页 Fragment 下标，也不阻断浏览器与客服功能。
+
+### 蓝牙连接恢复
+
+- 返回首页或系统蓝牙重新开启后，按设置的间隔执行有限次数恢复，默认间隔 15 秒、最多 3 轮。
+- 间隔支持 5–60 秒、步进 5 秒，最多恢复轮数支持 1–5 次。
+- 已登录或正在连接时不会重复发起；权限不足或蓝牙关闭时静默停止，不弹出模块权限框。
+- 按车型复用官方 `BleHandler`、`initBleTLink()` 或 `initBleTLinkQgj()`，不发送自定义控车指令，也不主动断开现有连接。
+
 ### 感应距离
 
 - 使用两个 0.5 米步进的滑块设置靠近解锁与远离落锁阈值。
@@ -54,7 +67,7 @@
 ## 默认设置
 
 - 默认开启：模块总开关、严格版本保护、官方设置入口、现有广告清理、App 升级弹窗拦截、使用行为上报屏蔽、轨迹导出、轨迹首尾隐私裁剪、车辆能力诊断。
-- 默认关闭：Bugly 屏蔽、首页导航精简、爱车与服务互换、感应距离覆盖、详细日志。
+- 默认关闭：极速启动、蓝牙连接恢复、Bugly 屏蔽、首页导航精简、爱车与服务互换、感应距离覆盖、详细日志。
 
 ## 构建
 
@@ -64,7 +77,7 @@
 - `.github/workflows/android-release-signed.yml`：手动触发签名 release。
 - `.github/workflows/android-release-tag.yml`：推送与 `moduleVersionName` 一致的版本 tag 后创建 GitHub Release。
 
-当前版本由 `gradle.properties` 唯一管理：`moduleVersionCode=10700`、`moduleVersionName=v1.7.0`。
+当前版本由 `gradle.properties` 唯一管理：`moduleVersionCode=10800`、`moduleVersionName=v1.8.0`。
 
 ## 启用
 

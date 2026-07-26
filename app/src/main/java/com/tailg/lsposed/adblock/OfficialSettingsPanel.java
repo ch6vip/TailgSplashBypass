@@ -42,6 +42,12 @@ import java.util.WeakHashMap;
 final class OfficialSettingsPanel {
     private static final String TAG = "TailgSettingsPanel";
     private static final int DISTANCE_PROGRESS_MAX = 18;
+    private static final int BLE_INTERVAL_PROGRESS_MAX =
+            (BleReconnectPolicy.MAX_INTERVAL_SECONDS
+                    - BleReconnectPolicy.MIN_INTERVAL_SECONDS)
+                    / BleReconnectPolicy.INTERVAL_STEP_SECONDS;
+    private static final int BLE_ATTEMPTS_PROGRESS_MAX =
+            BleReconnectPolicy.MAX_ATTEMPTS - BleReconnectPolicy.MIN_ATTEMPTS;
     private static final Map<Activity, WeakReference<Dialog>> OPEN_DIALOGS =
             Collections.synchronizedMap(new WeakHashMap<>());
 
@@ -59,6 +65,12 @@ final class OfficialSettingsPanel {
     private TextView lockValue;
     private View unlockRow;
     private View lockRow;
+    private SeekBar reconnectIntervalSeekBar;
+    private SeekBar reconnectAttemptsSeekBar;
+    private TextView reconnectIntervalValue;
+    private TextView reconnectAttemptsValue;
+    private View reconnectIntervalRow;
+    private View reconnectAttemptsRow;
 
     private OfficialSettingsPanel(Activity activity) {
         this.activity = activity;
@@ -262,6 +274,14 @@ final class OfficialSettingsPanel {
             section.addView(createDivider(dp(16)));
             section.addView(lockRow);
         }
+        if (group == Group.BLE) {
+            section.addView(createDivider(dp(16)));
+            reconnectIntervalRow = createReconnectParameterRow(true);
+            reconnectAttemptsRow = createReconnectParameterRow(false);
+            section.addView(reconnectIntervalRow);
+            section.addView(createDivider(dp(16)));
+            section.addView(reconnectAttemptsRow);
+        }
         return section;
     }
 
@@ -420,6 +440,91 @@ final class OfficialSettingsPanel {
         return row;
     }
 
+    private View createReconnectParameterRow(boolean interval) {
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(dp(16), dp(12), dp(16), dp(10));
+
+        LinearLayout heading = new LinearLayout(activity);
+        heading.setOrientation(LinearLayout.HORIZONTAL);
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView title = new TextView(activity);
+        title.setText(interval ? "重试间隔" : "最大尝试次数");
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15.0f);
+        title.setTextColor(palette.onSurface);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        title.setLetterSpacing(0.0f);
+        heading.addView(title, new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1.0f
+        ));
+
+        TextView value = new TextView(activity);
+        value.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14.0f);
+        value.setTextColor(palette.primary);
+        value.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        value.setLetterSpacing(0.0f);
+        value.setGravity(Gravity.END);
+        value.setMinWidth(dp(64));
+        heading.addView(value);
+        row.addView(heading);
+
+        TextView description = new TextView(activity);
+        description.setText(interval
+                ? "每轮恢复检查之间的等待时间"
+                : "单次触发最多执行的恢复轮数");
+        description.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f);
+        description.setTextColor(palette.onSurfaceVariant);
+        description.setLetterSpacing(0.0f);
+        row.addView(description);
+
+        SeekBar seekBar = new SeekBar(activity);
+        seekBar.setMax(interval
+                ? BLE_INTERVAL_PROGRESS_MAX
+                : BLE_ATTEMPTS_PROGRESS_MAX);
+        seekBar.setContentDescription(interval ? "蓝牙重试间隔" : "蓝牙最大尝试次数");
+        seekBar.setSplitTrack(false);
+        seekBar.setProgressTintList(ColorStateList.valueOf(palette.primary));
+        seekBar.setProgressBackgroundTintList(
+                ColorStateList.valueOf(palette.outlineVariant)
+        );
+        seekBar.setThumbTintList(ColorStateList.valueOf(palette.primary));
+        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                updateReconnectLabels();
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar bar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar bar) {
+                if (!refreshing) {
+                    persistReconnectParameters();
+                }
+            }
+        });
+        LinearLayout.LayoutParams seekParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(44)
+        );
+        seekParams.topMargin = dp(4);
+        row.addView(seekBar, seekParams);
+
+        if (interval) {
+            reconnectIntervalSeekBar = seekBar;
+            reconnectIntervalValue = value;
+        } else {
+            reconnectAttemptsSeekBar = seekBar;
+            reconnectAttemptsValue = value;
+        }
+        return row;
+    }
+
     private void refreshFromPreferences() {
         refreshing = true;
         try {
@@ -440,6 +545,20 @@ final class OfficialSettingsPanel {
                     )
             );
             setDistanceProgress(distances);
+            setReconnectProgress(
+                    BleReconnectPolicy.normalizeIntervalSeconds(
+                            preferences.getInt(
+                                    ConfigKeys.KEY_BLE_RECONNECT_INTERVAL_SECONDS,
+                                    ConfigKeys.DEFAULT_BLE_RECONNECT_INTERVAL_SECONDS
+                            )
+                    ),
+                    BleReconnectPolicy.normalizeMaxAttempts(
+                            preferences.getInt(
+                                    ConfigKeys.KEY_BLE_RECONNECT_MAX_ATTEMPTS,
+                                    ConfigKeys.DEFAULT_BLE_RECONNECT_MAX_ATTEMPTS
+                            )
+                    )
+            );
         } catch (RuntimeException error) {
             Log.w(TAG, "Read host settings failed", error);
             Toast.makeText(activity, "读取配置失败", Toast.LENGTH_SHORT).show();
@@ -447,6 +566,7 @@ final class OfficialSettingsPanel {
             refreshing = false;
         }
         updateDistanceLabels();
+        updateReconnectLabels();
         applyGating();
     }
 
@@ -514,6 +634,50 @@ final class OfficialSettingsPanel {
         refreshing = previousRefreshing;
     }
 
+    private void persistReconnectParameters() {
+        if (reconnectIntervalSeekBar == null || reconnectAttemptsSeekBar == null) {
+            return;
+        }
+        int interval = BleReconnectPolicy.MIN_INTERVAL_SECONDS
+                + reconnectIntervalSeekBar.getProgress()
+                * BleReconnectPolicy.INTERVAL_STEP_SECONDS;
+        int attempts = BleReconnectPolicy.MIN_ATTEMPTS
+                + reconnectAttemptsSeekBar.getProgress();
+        try {
+            boolean intervalSaved = preferences.encode(
+                    ConfigKeys.KEY_BLE_RECONNECT_INTERVAL_SECONDS,
+                    interval
+            );
+            boolean attemptsSaved = preferences.encode(
+                    ConfigKeys.KEY_BLE_RECONNECT_MAX_ATTEMPTS,
+                    attempts
+            );
+            if (!intervalSaved || !attemptsSaved) {
+                throw new IllegalStateException("MMKV encode returned false");
+            }
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Write BLE recovery settings failed", error);
+            Toast.makeText(activity, "保存蓝牙恢复配置失败", Toast.LENGTH_SHORT).show();
+            refreshFromPreferences();
+        }
+    }
+
+    private void setReconnectProgress(int interval, int attempts) {
+        if (reconnectIntervalSeekBar == null || reconnectAttemptsSeekBar == null) {
+            return;
+        }
+        boolean previousRefreshing = refreshing;
+        refreshing = true;
+        reconnectIntervalSeekBar.setProgress(
+                (interval - BleReconnectPolicy.MIN_INTERVAL_SECONDS)
+                        / BleReconnectPolicy.INTERVAL_STEP_SECONDS
+        );
+        reconnectAttemptsSeekBar.setProgress(
+                attempts - BleReconnectPolicy.MIN_ATTEMPTS
+        );
+        refreshing = previousRefreshing;
+    }
+
     private void updateDistanceLabels() {
         if (unlockValue == null || lockValue == null
                 || unlockSeekBar == null || lockSeekBar == null) {
@@ -529,6 +693,20 @@ final class OfficialSettingsPanel {
                 "%.1f 米",
                 lockFromProgress(lockSeekBar.getProgress())
         ));
+    }
+
+    private void updateReconnectLabels() {
+        if (reconnectIntervalValue == null || reconnectAttemptsValue == null
+                || reconnectIntervalSeekBar == null || reconnectAttemptsSeekBar == null) {
+            return;
+        }
+        int interval = BleReconnectPolicy.MIN_INTERVAL_SECONDS
+                + reconnectIntervalSeekBar.getProgress()
+                * BleReconnectPolicy.INTERVAL_STEP_SECONDS;
+        int attempts = BleReconnectPolicy.MIN_ATTEMPTS
+                + reconnectAttemptsSeekBar.getProgress();
+        reconnectIntervalValue.setText(interval + " 秒");
+        reconnectAttemptsValue.setText(attempts + " 次");
     }
 
     private float unlockFromProgress(int progress) {
@@ -563,6 +741,17 @@ final class OfficialSettingsPanel {
                 && isChecked(ConfigKeys.KEY_OVERRIDE_PROXIMITY_DISTANCE);
         setDistanceEnabled(unlockRow, unlockSeekBar, distanceEnabled);
         setDistanceEnabled(lockRow, lockSeekBar, distanceEnabled);
+        boolean reconnectEnabled = masterEnabled && isChecked(ConfigKeys.KEY_BLE_RECONNECT);
+        setDistanceEnabled(
+                reconnectIntervalRow,
+                reconnectIntervalSeekBar,
+                reconnectEnabled
+        );
+        setDistanceEnabled(
+                reconnectAttemptsRow,
+                reconnectAttemptsSeekBar,
+                reconnectEnabled
+        );
     }
 
     private boolean isChecked(String key) {
@@ -624,6 +813,9 @@ final class OfficialSettingsPanel {
         add(result, ConfigKeys.KEY_HOOK_APP_UPDATE, "拦截 App 升级弹窗",
                 "不影响车辆固件或 OTA", ConfigKeys.DEFAULT_HOOK_APP_UPDATE,
                 Group.HOME, null);
+        add(result, ConfigKeys.KEY_FAST_STARTUP, "极速启动模式",
+                "延迟 X5 与客服 SDK 到首次使用", ConfigKeys.DEFAULT_FAST_STARTUP,
+                Group.HOME, null);
         add(result, ConfigKeys.KEY_SIMPLIFY_HOME_NAV, "精简首页导航",
                 "隐藏圈子和商城", ConfigKeys.DEFAULT_SIMPLIFY_HOME_NAV,
                 Group.HOME, null);
@@ -651,6 +843,10 @@ final class OfficialSettingsPanel {
         add(result, ConfigKeys.KEY_OVERRIDE_PROXIMITY_DISTANCE, "覆盖旧版 RSSI 距离",
                 "只修改旧 BleConnectService 阈值", ConfigKeys.DEFAULT_OVERRIDE_PROXIMITY_DISTANCE,
                 Group.PROXIMITY, null);
+
+        add(result, ConfigKeys.KEY_BLE_RECONNECT, "蓝牙连接恢复",
+                "返回首页或蓝牙开启后有限重试", ConfigKeys.DEFAULT_BLE_RECONNECT,
+                Group.BLE, null);
 
         add(result, ConfigKeys.KEY_VERBOSE_LOG, "详细日志",
                 "输出 Hook 安装详情", ConfigKeys.DEFAULT_VERBOSE_LOG,
@@ -873,6 +1069,7 @@ final class OfficialSettingsPanel {
         GENERAL("总控"),
         SPLASH("开屏广告"),
         HOME("首页与诊断"),
+        BLE("车辆连接"),
         PRIVACY("隐私"),
         DATA("轨迹数据"),
         PROXIMITY("旧版 RSSI 感应距离"),

@@ -12,10 +12,12 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -38,6 +40,10 @@ public class TailgAdBlockModule extends XposedModule {
             "com.tailg.run.intelligence.net.TailgRepository";
     private static final String HOME_ACTIVITY =
             "com.tailg.run.intelligence.model.home.activity.HomeActivity";
+    private static final String QY_OPTIONS_UTIL =
+            "com.tailg.run.intelligence.qyapi.QYOptionsUtil";
+    private static final String UNICORN = "com.qiyukf.unicorn.api.Unicorn";
+    private static final String X5_WEBVIEW = "com.tencent.smtt.sdk.WebView";
     private static final String TRACK_DETAIL_ACTIVITY =
             "com.tailg.run.intelligence.model.mine_historical_track.activity.TrackDetailActivity";
     private static final String CAR_CONTROL_INFO_BEAN =
@@ -190,6 +196,7 @@ public class TailgAdBlockModule extends XposedModule {
                 config.forceDurationZero,
                 config.forceEmptyBanner,
                 config.hookAppUpdate,
+                config.fastStartup,
                 config.blockUsageReport,
                 config.blockBugly,
                 config.simplifyHomeNav,
@@ -197,6 +204,7 @@ public class TailgAdBlockModule extends XposedModule {
                 config.enableVehicleDiagnostics,
                 config.enableTrackExport,
                 config.overrideProximityDistance,
+                config.bleReconnect,
                 config.showOfficialSettingsEntry
         );
         HookInstallReport report = new HookInstallReport();
@@ -223,6 +231,14 @@ public class TailgAdBlockModule extends XposedModule {
                         classLoader,
                         config,
                         requestPlan.appUpdateRequestCount(),
+                        report
+                );
+            }
+            if (requestPlan.hasFastStartupHooks()) {
+                installFastStartupHooks(
+                        classLoader,
+                        config,
+                        requestPlan.fastStartupRequestCount(),
                         report
                 );
             }
@@ -422,6 +438,37 @@ public class TailgAdBlockModule extends XposedModule {
         if (config.blockBugly) {
             installVoidBlockHook(homeClass, "initTencentBugly", config.verboseLog, report);
         }
+        if (config.bleReconnect) {
+            Method onResume = findNoArgMethod(homeClass, "onResume");
+            if (onResume == null || onResume.getReturnType() != Void.TYPE
+                    || Modifier.isStatic(onResume.getModifiers())) {
+                report.markSkipped();
+            } else {
+                try {
+                    hook(onResume)
+                            .setPriority(PRIORITY_HIGHEST)
+                            .setExceptionMode(ExceptionMode.PROTECTIVE)
+                            .intercept(chain -> {
+                                Object result = chain.proceed();
+                                Object target = chain.getThisObject();
+                                if (target instanceof Activity activity) {
+                                    BleReconnectController.onHomeResumed(
+                                            activity,
+                                            classLoader,
+                                            config.bleReconnectIntervalSeconds,
+                                            config.bleReconnectMaxAttempts,
+                                            config.verboseLog
+                                    );
+                                }
+                                return result;
+                            });
+                    report.markInstalled();
+                } catch (Throwable error) {
+                    report.markFailed();
+                    log(Log.ERROR, TAG, "Install HomeActivity BLE recovery hook failed", error);
+                }
+            }
+        }
         if (config.simplifyHomeNav
                 || config.swapControlServiceNav
                 || config.enableVehicleDiagnostics) {
@@ -456,6 +503,172 @@ public class TailgAdBlockModule extends XposedModule {
                 report.markFailed();
                 log(Log.ERROR, TAG, "Install HomeActivity enhancement hook failed", error);
             }
+        }
+    }
+
+    private void installFastStartupHooks(
+            ClassLoader classLoader,
+            ModuleConfig config,
+            int requestCount,
+            HookInstallReport report
+    ) {
+        Class<?> homeClass = tryLoadClass(
+                classLoader,
+                HOME_ACTIVITY,
+                "HomeActivity",
+                1,
+                report
+        );
+        if (homeClass != null) {
+            installVoidBlockHook(homeClass, "initTBS", config.verboseLog, report);
+        }
+
+        Class<?> unicornClass = tryLoadClass(classLoader, UNICORN, "Unicorn", 1, report);
+        if (unicornClass != null) {
+            installLazyUnicornHook(unicornClass, config.verboseLog, report);
+        }
+
+        Class<?> qyOptionsClass = tryLoadClass(
+                classLoader,
+                QY_OPTIONS_UTIL,
+                "QYOptionsUtil",
+                1,
+                report
+        );
+        if (qyOptionsClass != null) {
+            installCustomerServiceEntryHook(
+                    qyOptionsClass,
+                    classLoader,
+                    config.verboseLog,
+                    report
+            );
+        }
+
+        int webViewRequests = Math.max(0, requestCount - 3);
+        Class<?> webViewClass = tryLoadClass(
+                classLoader,
+                X5_WEBVIEW,
+                "X5 WebView",
+                webViewRequests,
+                report
+        );
+        if (webViewClass == null) {
+            return;
+        }
+        installLazyTbsConstructorHook(
+                findConstructor(
+                        webViewClass,
+                        Context.class,
+                        android.util.AttributeSet.class,
+                        int.class,
+                        Map.class,
+                        boolean.class
+                ),
+                classLoader,
+                config.verboseLog,
+                report
+        );
+        installLazyTbsConstructorHook(
+                findConstructor(webViewClass, Context.class, boolean.class),
+                classLoader,
+                config.verboseLog,
+                report
+        );
+    }
+
+    private void installLazyUnicornHook(
+            Class<?> unicornClass,
+            boolean verboseLog,
+            HookInstallReport report
+    ) {
+        Method initSdk = findNoArgMethod(unicornClass, "initSdk");
+        if (initSdk == null || initSdk.getReturnType() != Boolean.TYPE
+                || !Modifier.isStatic(initSdk.getModifiers())) {
+            report.markSkipped();
+            return;
+        }
+        try {
+            hook(initSdk)
+                    .setPriority(PRIORITY_HIGHEST)
+                    .setExceptionMode(ExceptionMode.PROTECTIVE)
+                    .intercept(chain -> FastStartupController.isUnicornInitializationAllowed()
+                            ? chain.proceed()
+                            : false);
+            report.markInstalled();
+            if (verboseLog) {
+                log(Log.INFO, TAG, "Deferred Unicorn#initSdk until customer service opens");
+            }
+        } catch (Throwable error) {
+            report.markFailed();
+            log(Log.ERROR, TAG, "Install lazy Unicorn hook failed", error);
+        }
+    }
+
+    private void installCustomerServiceEntryHook(
+            Class<?> qyOptionsClass,
+            ClassLoader classLoader,
+            boolean verboseLog,
+            HookInstallReport report
+    ) {
+        try {
+            Method entry = null;
+            for (Method candidate : qyOptionsClass.getDeclaredMethods()) {
+                Class<?>[] parameters = candidate.getParameterTypes();
+                if ("openServiceActivity".equals(candidate.getName())
+                        && parameters.length == 3
+                        && Context.class.isAssignableFrom(parameters[0])
+                        && parameters[1] == Integer.TYPE) {
+                    entry = candidate;
+                    break;
+                }
+            }
+            if (entry == null || entry.getReturnType() != Void.TYPE
+                    || !Modifier.isStatic(entry.getModifiers())) {
+                report.markSkipped();
+                return;
+            }
+            hook(entry)
+                    .setPriority(PRIORITY_HIGHEST)
+                    .setExceptionMode(ExceptionMode.PROTECTIVE)
+                    .intercept(chain -> {
+                        FastStartupController.ensureUnicornInitialized(classLoader);
+                        return chain.proceed();
+                    });
+            report.markInstalled();
+            if (verboseLog) {
+                log(Log.INFO, TAG, "Hooked customer-service entry for lazy Unicorn init");
+            }
+        } catch (Throwable error) {
+            report.markFailed();
+            log(Log.ERROR, TAG, "Install customer-service lazy-init hook failed", error);
+        }
+    }
+
+    private void installLazyTbsConstructorHook(
+            Constructor<?> constructor,
+            ClassLoader classLoader,
+            boolean verboseLog,
+            HookInstallReport report
+    ) {
+        if (constructor == null) {
+            report.markSkipped();
+            return;
+        }
+        try {
+            hook(constructor)
+                    .setPriority(PRIORITY_HIGHEST)
+                    .setExceptionMode(ExceptionMode.PROTECTIVE)
+                    .intercept(chain -> {
+                        FastStartupController.ensureTbsConfigured(classLoader);
+                        return chain.proceed();
+                    });
+            report.markInstalled();
+            if (verboseLog) {
+                log(Log.INFO, TAG, "Hooked X5 WebView constructor for lazy configuration");
+            }
+        } catch (Throwable error) {
+            report.markFailed();
+            log(Log.ERROR, TAG, "Install lazy X5 constructor hook failed", error);
         }
     }
 
@@ -776,6 +989,19 @@ public class TailgAdBlockModule extends XposedModule {
         }
     }
 
+    private Constructor<?> findConstructor(Class<?> targetClazz, Class<?>... parameterTypes) {
+        try {
+            return targetClazz.getDeclaredConstructor(parameterTypes);
+        } catch (NoSuchMethodException error) {
+            log(Log.WARN, TAG, "Constructor missing: " + targetClazz.getSimpleName());
+            return null;
+        } catch (Throwable error) {
+            log(Log.ERROR, TAG, "Resolve constructor failed: "
+                    + targetClazz.getSimpleName(), error);
+            return null;
+        }
+    }
+
     private void logInstallSummary(HookInstallReport report) {
         String summary = report.summaryMessage();
         if (report.shouldWarnSummary()) {
@@ -798,6 +1024,18 @@ public class TailgAdBlockModule extends XposedModule {
                             defaults.proximityLockMeters
                     )
             );
+            int reconnectInterval = BleReconnectPolicy.normalizeIntervalSeconds(
+                    prefs.getInt(
+                            ConfigKeys.KEY_BLE_RECONNECT_INTERVAL_SECONDS,
+                            defaults.bleReconnectIntervalSeconds
+                    )
+            );
+            int reconnectAttempts = BleReconnectPolicy.normalizeMaxAttempts(
+                    prefs.getInt(
+                            ConfigKeys.KEY_BLE_RECONNECT_MAX_ATTEMPTS,
+                            defaults.bleReconnectMaxAttempts
+                    )
+            );
             return new ModuleConfig(
                     prefs.getBoolean(ConfigKeys.KEY_ENABLE_MODULE, defaults.enableModule),
                     prefs.getBoolean(ConfigKeys.KEY_STRICT_VERSION_GUARD, defaults.strictVersionGuard),
@@ -808,6 +1046,7 @@ public class TailgAdBlockModule extends XposedModule {
                     prefs.getBoolean(ConfigKeys.KEY_FORCE_DURATION_ZERO, defaults.forceDurationZero),
                     prefs.getBoolean(ConfigKeys.KEY_FORCE_EMPTY_BANNER, defaults.forceEmptyBanner),
                     prefs.getBoolean(ConfigKeys.KEY_HOOK_APP_UPDATE, defaults.hookAppUpdate),
+                    prefs.getBoolean(ConfigKeys.KEY_FAST_STARTUP, defaults.fastStartup),
                     prefs.getBoolean(ConfigKeys.KEY_BLOCK_USAGE_REPORT, defaults.blockUsageReport),
                     prefs.getBoolean(ConfigKeys.KEY_BLOCK_BUGLY, defaults.blockBugly),
                     prefs.getBoolean(ConfigKeys.KEY_SIMPLIFY_HOME_NAV, defaults.simplifyHomeNav),
@@ -829,6 +1068,9 @@ public class TailgAdBlockModule extends XposedModule {
                             ConfigKeys.KEY_SHOW_OFFICIAL_SETTINGS_ENTRY,
                             defaults.showOfficialSettingsEntry
                     ),
+                    prefs.getBoolean(ConfigKeys.KEY_BLE_RECONNECT, defaults.bleReconnect),
+                    reconnectInterval,
+                    reconnectAttempts,
                     distances.unlockMeters,
                     distances.lockMeters,
                     prefs.getBoolean(ConfigKeys.KEY_VERBOSE_LOG, defaults.verboseLog)
@@ -888,6 +1130,7 @@ public class TailgAdBlockModule extends XposedModule {
         final boolean forceDurationZero;
         final boolean forceEmptyBanner;
         final boolean hookAppUpdate;
+        final boolean fastStartup;
         final boolean blockUsageReport;
         final boolean blockBugly;
         final boolean simplifyHomeNav;
@@ -897,6 +1140,9 @@ public class TailgAdBlockModule extends XposedModule {
         final boolean enableVehicleDiagnostics;
         final boolean overrideProximityDistance;
         final boolean showOfficialSettingsEntry;
+        final boolean bleReconnect;
+        final int bleReconnectIntervalSeconds;
+        final int bleReconnectMaxAttempts;
         final float proximityUnlockMeters;
         final float proximityLockMeters;
         final boolean verboseLog;
@@ -911,6 +1157,7 @@ public class TailgAdBlockModule extends XposedModule {
                 boolean forceDurationZero,
                 boolean forceEmptyBanner,
                 boolean hookAppUpdate,
+                boolean fastStartup,
                 boolean blockUsageReport,
                 boolean blockBugly,
                 boolean simplifyHomeNav,
@@ -920,6 +1167,9 @@ public class TailgAdBlockModule extends XposedModule {
                 boolean enableVehicleDiagnostics,
                 boolean overrideProximityDistance,
                 boolean showOfficialSettingsEntry,
+                boolean bleReconnect,
+                int bleReconnectIntervalSeconds,
+                int bleReconnectMaxAttempts,
                 float proximityUnlockMeters,
                 float proximityLockMeters,
                 boolean verboseLog
@@ -933,6 +1183,7 @@ public class TailgAdBlockModule extends XposedModule {
             this.forceDurationZero = forceDurationZero;
             this.forceEmptyBanner = forceEmptyBanner;
             this.hookAppUpdate = hookAppUpdate;
+            this.fastStartup = fastStartup;
             this.blockUsageReport = blockUsageReport;
             this.blockBugly = blockBugly;
             this.simplifyHomeNav = simplifyHomeNav;
@@ -942,6 +1193,9 @@ public class TailgAdBlockModule extends XposedModule {
             this.enableVehicleDiagnostics = enableVehicleDiagnostics;
             this.overrideProximityDistance = overrideProximityDistance;
             this.showOfficialSettingsEntry = showOfficialSettingsEntry;
+            this.bleReconnect = bleReconnect;
+            this.bleReconnectIntervalSeconds = bleReconnectIntervalSeconds;
+            this.bleReconnectMaxAttempts = bleReconnectMaxAttempts;
             this.proximityUnlockMeters = proximityUnlockMeters;
             this.proximityLockMeters = proximityLockMeters;
             this.verboseLog = verboseLog;
@@ -958,6 +1212,7 @@ public class TailgAdBlockModule extends XposedModule {
                     ConfigKeys.DEFAULT_FORCE_DURATION_ZERO,
                     ConfigKeys.DEFAULT_FORCE_EMPTY_BANNER,
                     ConfigKeys.DEFAULT_HOOK_APP_UPDATE,
+                    ConfigKeys.DEFAULT_FAST_STARTUP,
                     ConfigKeys.DEFAULT_BLOCK_USAGE_REPORT,
                     ConfigKeys.DEFAULT_BLOCK_BUGLY,
                     ConfigKeys.DEFAULT_SIMPLIFY_HOME_NAV,
@@ -967,6 +1222,9 @@ public class TailgAdBlockModule extends XposedModule {
                     ConfigKeys.DEFAULT_ENABLE_VEHICLE_DIAGNOSTICS,
                     ConfigKeys.DEFAULT_OVERRIDE_PROXIMITY_DISTANCE,
                     ConfigKeys.DEFAULT_SHOW_OFFICIAL_SETTINGS_ENTRY,
+                    ConfigKeys.DEFAULT_BLE_RECONNECT,
+                    ConfigKeys.DEFAULT_BLE_RECONNECT_INTERVAL_SECONDS,
+                    ConfigKeys.DEFAULT_BLE_RECONNECT_MAX_ATTEMPTS,
                     ConfigKeys.DEFAULT_PROXIMITY_UNLOCK_METERS,
                     ConfigKeys.DEFAULT_PROXIMITY_LOCK_METERS,
                     ConfigKeys.DEFAULT_VERBOSE_LOG

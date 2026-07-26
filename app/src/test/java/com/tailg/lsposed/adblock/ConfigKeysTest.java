@@ -32,4 +32,12 @@ public class ConfigKeysTest {
             assertTrue(expected.getMessage().contains("unknown"));
         }
     }
+
+    @Test
+    public void optionalStartupAndReconnectFeatures_defaultToOff() {
+        assertFalse(ConfigKeys.defaultBooleanFor(ConfigKeys.KEY_FAST_STARTUP));
+        assertFalse(ConfigKeys.defaultBooleanFor(ConfigKeys.KEY_BLE_RECONNECT));
+        assertEquals(15, ConfigKeys.DEFAULT_BLE_RECONNECT_INTERVAL_SECONDS);
+        assertEquals(3, ConfigKeys.DEFAULT_BLE_RECONNECT_MAX_ATTEMPTS);
+    }
 }

@@ -12,6 +12,7 @@ final class ConfigKeys {
     static final String KEY_FORCE_DURATION_ZERO = "force_duration_zero";
     static final String KEY_FORCE_EMPTY_BANNER = "force_empty_banner";
     static final String KEY_HOOK_APP_UPDATE = "hook_app_update";
+    static final String KEY_FAST_STARTUP = "fast_startup";
     static final String KEY_BLOCK_USAGE_REPORT = "block_usage_report";
     static final String KEY_BLOCK_BUGLY = "block_bugly";
     static final String KEY_SIMPLIFY_HOME_NAV = "simplify_home_nav";
@@ -22,6 +23,9 @@ final class ConfigKeys {
     static final String KEY_OVERRIDE_PROXIMITY_DISTANCE = "override_proximity_distance";
     static final String KEY_PROXIMITY_UNLOCK_METERS = "proximity_unlock_meters";
     static final String KEY_PROXIMITY_LOCK_METERS = "proximity_lock_meters";
+    static final String KEY_BLE_RECONNECT = "ble_reconnect";
+    static final String KEY_BLE_RECONNECT_INTERVAL_SECONDS = "ble_reconnect_interval_seconds";
+    static final String KEY_BLE_RECONNECT_MAX_ATTEMPTS = "ble_reconnect_max_attempts";
     static final String KEY_VERBOSE_LOG = "verbose_log";
 
     static final boolean DEFAULT_ENABLE_MODULE = true;
@@ -34,6 +38,7 @@ final class ConfigKeys {
     static final boolean DEFAULT_FORCE_DURATION_ZERO = true;
     static final boolean DEFAULT_FORCE_EMPTY_BANNER = true;
     static final boolean DEFAULT_HOOK_APP_UPDATE = true;
+    static final boolean DEFAULT_FAST_STARTUP = false;
     static final boolean DEFAULT_BLOCK_USAGE_REPORT = true;
     static final boolean DEFAULT_BLOCK_BUGLY = false;
     static final boolean DEFAULT_SIMPLIFY_HOME_NAV = false;
@@ -44,6 +49,9 @@ final class ConfigKeys {
     static final boolean DEFAULT_OVERRIDE_PROXIMITY_DISTANCE = false;
     static final float DEFAULT_PROXIMITY_UNLOCK_METERS = 2.0f;
     static final float DEFAULT_PROXIMITY_LOCK_METERS = 3.0f;
+    static final boolean DEFAULT_BLE_RECONNECT = false;
+    static final int DEFAULT_BLE_RECONNECT_INTERVAL_SECONDS = 15;
+    static final int DEFAULT_BLE_RECONNECT_MAX_ATTEMPTS = 3;
     static final boolean DEFAULT_VERBOSE_LOG = false;
 
     static final String[] BOOLEAN_KEYS = {
@@ -57,6 +65,7 @@ final class ConfigKeys {
             KEY_FORCE_DURATION_ZERO,
             KEY_FORCE_EMPTY_BANNER,
             KEY_HOOK_APP_UPDATE,
+            KEY_FAST_STARTUP,
             KEY_BLOCK_USAGE_REPORT,
             KEY_BLOCK_BUGLY,
             KEY_SIMPLIFY_HOME_NAV,
@@ -65,6 +74,7 @@ final class ConfigKeys {
             KEY_TRIM_TRACK_ENDPOINTS,
             KEY_ENABLE_VEHICLE_DIAGNOSTICS,
             KEY_OVERRIDE_PROXIMITY_DISTANCE,
+            KEY_BLE_RECONNECT,
             KEY_VERBOSE_LOG
     };
 
@@ -99,6 +109,8 @@ final class ConfigKeys {
                 return DEFAULT_FORCE_EMPTY_BANNER;
             case KEY_HOOK_APP_UPDATE:
                 return DEFAULT_HOOK_APP_UPDATE;
+            case KEY_FAST_STARTUP:
+                return DEFAULT_FAST_STARTUP;
             case KEY_BLOCK_USAGE_REPORT:
                 return DEFAULT_BLOCK_USAGE_REPORT;
             case KEY_BLOCK_BUGLY:
@@ -115,6 +127,8 @@ final class ConfigKeys {
                 return DEFAULT_ENABLE_VEHICLE_DIAGNOSTICS;
             case KEY_OVERRIDE_PROXIMITY_DISTANCE:
                 return DEFAULT_OVERRIDE_PROXIMITY_DISTANCE;
+            case KEY_BLE_RECONNECT:
+                return DEFAULT_BLE_RECONNECT;
             case KEY_VERBOSE_LOG:
                 return DEFAULT_VERBOSE_LOG;
             default:
