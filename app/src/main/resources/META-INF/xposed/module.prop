@@ -2,4 +2,4 @@ minApiVersion=101
 targetApiVersion=101
 staticScope=true
 name=Tailg LSPosed Toolkit
-description=Privacy, track export, diagnostics, home cleanup, proximity thresholds, and ad blocking for Tailg 3.5.9
+description=Privacy, track export, diagnostics, official settings entry, proximity thresholds, and ad blocking for Tailg 3.5.9

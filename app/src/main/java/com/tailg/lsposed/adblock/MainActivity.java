@@ -415,6 +415,9 @@ public class MainActivity extends AppCompatActivity implements ModuleApplication
                 R.string.desc_enable_module, ConfigKeys.DEFAULT_ENABLE_MODULE, Group.GENERAL, null));
         list.add(new ToggleSpec(ConfigKeys.KEY_STRICT_VERSION_GUARD, R.string.switch_strict_version_guard,
                 R.string.desc_strict_version_guard, ConfigKeys.DEFAULT_STRICT_VERSION_GUARD, Group.GENERAL, null));
+        list.add(new ToggleSpec(ConfigKeys.KEY_SHOW_OFFICIAL_SETTINGS_ENTRY,
+                R.string.switch_official_settings_entry, R.string.desc_official_settings_entry,
+                ConfigKeys.DEFAULT_SHOW_OFFICIAL_SETTINGS_ENTRY, Group.GENERAL, null));
 
         list.add(new ToggleSpec(ConfigKeys.KEY_HOOK_SETUP_VIEW, R.string.switch_hook_setup_view,
                 R.string.desc_hook_setup_view, ConfigKeys.DEFAULT_HOOK_SETUP_VIEW, Group.SPLASH, null));

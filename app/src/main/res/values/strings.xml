@@ -22,6 +22,8 @@
     <string name="desc_enable_module">关闭后所有 Hook 均不安装</string>
     <string name="switch_strict_version_guard">仅受支持版本启用 Hook</string>
     <string name="desc_strict_version_guard">仅对已验证的 3.5.9 注入，其他版本自动跳过</string>
+    <string name="switch_official_settings_entry">在官方设置中显示工具箱入口</string>
+    <string name="desc_official_settings_entry">在官方 App 的设置页添加“Tailg 工具箱”选项</string>
 
     <string name="switch_hook_setup_view">跳过开屏初始化</string>
     <string name="desc_hook_setup_view">setupView → setupViewNo</string>

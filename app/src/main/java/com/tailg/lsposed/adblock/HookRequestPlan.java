@@ -8,6 +8,7 @@ final class HookRequestPlan {
     private final int homeActivityRequestCount;
     private final int trackExportRequestCount;
     private final int proximityRequestCount;
+    private final int officialSettingsRequestCount;
 
     private HookRequestPlan(
             int splashRequestCount,
@@ -16,7 +17,8 @@ final class HookRequestPlan {
             int repositoryRequestCount,
             int homeActivityRequestCount,
             int trackExportRequestCount,
-            int proximityRequestCount
+            int proximityRequestCount,
+            int officialSettingsRequestCount
     ) {
         this.splashRequestCount = splashRequestCount;
         this.configBeanRequestCount = configBeanRequestCount;
@@ -25,6 +27,7 @@ final class HookRequestPlan {
         this.homeActivityRequestCount = homeActivityRequestCount;
         this.trackExportRequestCount = trackExportRequestCount;
         this.proximityRequestCount = proximityRequestCount;
+        this.officialSettingsRequestCount = officialSettingsRequestCount;
     }
 
     static HookRequestPlan fromConfig(
@@ -40,7 +43,8 @@ final class HookRequestPlan {
             boolean simplifyHomeNav,
             boolean enableVehicleDiagnostics,
             boolean enableTrackExport,
-            boolean overrideProximityDistance
+            boolean overrideProximityDistance,
+            boolean showOfficialSettingsEntry
     ) {
         int splash = 0;
         if (hookSetupView) {
@@ -74,6 +78,7 @@ final class HookRequestPlan {
                 + (simplifyHomeNav || enableVehicleDiagnostics ? 1 : 0);
         int trackExport = enableTrackExport ? 1 : 0;
         int proximity = overrideProximityDistance ? 2 : 0;
+        int officialSettings = showOfficialSettingsEntry ? 2 : 0;
 
         return new HookRequestPlan(
                 splash,
@@ -82,7 +87,8 @@ final class HookRequestPlan {
                 repository,
                 homeActivity,
                 trackExport,
-                proximity
+                proximity,
+                officialSettings
         );
     }
 
@@ -114,6 +120,10 @@ final class HookRequestPlan {
         return proximityRequestCount > 0;
     }
 
+    boolean hasOfficialSettingsHooks() {
+        return officialSettingsRequestCount > 0;
+    }
+
     int splashRequestCount() {
         return splashRequestCount;
     }
@@ -142,6 +152,10 @@ final class HookRequestPlan {
         return proximityRequestCount;
     }
 
+    int officialSettingsRequestCount() {
+        return officialSettingsRequestCount;
+    }
+
     int totalRequestCount() {
         return splashRequestCount
                 + configBeanRequestCount
@@ -149,6 +163,7 @@ final class HookRequestPlan {
                 + repositoryRequestCount
                 + homeActivityRequestCount
                 + trackExportRequestCount
-                + proximityRequestCount;
+                + proximityRequestCount
+                + officialSettingsRequestCount;
     }
 }

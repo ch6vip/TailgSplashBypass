@@ -7,7 +7,9 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -37,6 +39,10 @@ public class TailgAdBlockModule extends XposedModule {
             "com.tailg.run.intelligence.model.mine_historical_track.activity.TrackDetailActivity";
     private static final String CAR_CONTROL_INFO_BEAN =
             "com.tailg.run.intelligence.model.home.bean.CarControlInfoBean";
+    private static final String SETTING_REVISION_FRAGMENT =
+            "com.tailg.run.intelligence.model.mine_setting.fragment.SettingRevisionFragment";
+    private static final String LEGACY_SETTING_ACTIVITY =
+            "com.tailg.run.intelligence.model.mine_setting.activity.SettingActivity";
 
     private final AtomicBoolean initializationScheduled = new AtomicBoolean(false);
 
@@ -114,7 +120,8 @@ public class TailgAdBlockModule extends XposedModule {
                 config.simplifyHomeNav,
                 config.enableVehicleDiagnostics,
                 config.enableTrackExport,
-                config.overrideProximityDistance
+                config.overrideProximityDistance,
+                config.showOfficialSettingsEntry
         );
         HookInstallReport report = new HookInstallReport();
         report.markRequested(requestPlan.totalRequestCount());
@@ -172,6 +179,14 @@ public class TailgAdBlockModule extends XposedModule {
                         classLoader,
                         config,
                         requestPlan.proximityRequestCount(),
+                        report
+                );
+            }
+            if (requestPlan.hasOfficialSettingsHooks()) {
+                installOfficialSettingsHooks(
+                        classLoader,
+                        config,
+                        requestPlan.officialSettingsRequestCount(),
                         report
                 );
             }
@@ -441,6 +456,91 @@ public class TailgAdBlockModule extends XposedModule {
         );
     }
 
+    private void installOfficialSettingsHooks(
+            ClassLoader classLoader,
+            ModuleConfig config,
+            int requestCount,
+            HookInstallReport report
+    ) {
+        int hookCount = requestCount / 2;
+        Class<?> revisionFragment = tryLoadClass(
+                classLoader,
+                SETTING_REVISION_FRAGMENT,
+                "SettingRevisionFragment",
+                hookCount,
+                report
+        );
+        if (revisionFragment != null) {
+            Method onViewCreated = findMethod(
+                    revisionFragment,
+                    "onViewCreated",
+                    View.class,
+                    Bundle.class
+            );
+            installSettingsEntryHook(
+                    onViewCreated,
+                    "SettingRevisionFragment#onViewCreated",
+                    chainTarget -> OfficialSettingsController.installRevisionEntry(chainTarget),
+                    config.verboseLog,
+                    report
+            );
+        }
+
+        Class<?> legacyActivity = tryLoadClass(
+                classLoader,
+                LEGACY_SETTING_ACTIVITY,
+                "SettingActivity",
+                requestCount - hookCount,
+                report
+        );
+        if (legacyActivity != null) {
+            Method setEventListener = findNoArgMethod(legacyActivity, "setEventListener");
+            installSettingsEntryHook(
+                    setEventListener,
+                    "SettingActivity#setEventListener",
+                    chainTarget -> {
+                        if (chainTarget instanceof Activity activity) {
+                            OfficialSettingsController.installLegacyEntry(activity);
+                        }
+                    },
+                    config.verboseLog,
+                    report
+            );
+        }
+    }
+
+    private void installSettingsEntryHook(
+            Method method,
+            String methodLabel,
+            SettingsEntryInstaller installer,
+            boolean verboseLog,
+            HookInstallReport report
+    ) {
+        if (method == null || method.getReturnType() != Void.TYPE
+                || Modifier.isStatic(method.getModifiers())) {
+            report.markSkipped();
+            return;
+        }
+        try {
+            hook(method)
+                    .setPriority(PRIORITY_HIGHEST)
+                    .setExceptionMode(ExceptionMode.PROTECTIVE)
+                    .intercept(chain -> {
+                        Object result = chain.proceed();
+                        installer.install(chain.getThisObject());
+                        return result;
+                    });
+            report.markInstalled();
+            if (verboseLog) {
+                log(Log.INFO, TAG, "Hooked official settings entry: " + methodLabel);
+            }
+        } catch (Throwable error) {
+            report.markFailed();
+            log(Log.ERROR, TAG, "Install official settings entry hook failed: "
+                    + methodLabel, error);
+        }
+    }
+
     private Class<?> tryLoadClass(
             ClassLoader classLoader,
             String className,
@@ -653,6 +753,10 @@ public class TailgAdBlockModule extends XposedModule {
                             ConfigKeys.KEY_OVERRIDE_PROXIMITY_DISTANCE,
                             defaults.overrideProximityDistance
                     ),
+                    prefs.getBoolean(
+                            ConfigKeys.KEY_SHOW_OFFICIAL_SETTINGS_ENTRY,
+                            defaults.showOfficialSettingsEntry
+                    ),
                     distances.unlockMeters,
                     distances.lockMeters,
                     prefs.getBoolean(ConfigKeys.KEY_VERBOSE_LOG, defaults.verboseLog)
@@ -719,6 +823,7 @@ public class TailgAdBlockModule extends XposedModule {
         final boolean trimTrackEndpoints;
         final boolean enableVehicleDiagnostics;
         final boolean overrideProximityDistance;
+        final boolean showOfficialSettingsEntry;
         final float proximityUnlockMeters;
         final float proximityLockMeters;
         final boolean verboseLog;
@@ -740,6 +845,7 @@ public class TailgAdBlockModule extends XposedModule {
                 boolean trimTrackEndpoints,
                 boolean enableVehicleDiagnostics,
                 boolean overrideProximityDistance,
+                boolean showOfficialSettingsEntry,
                 float proximityUnlockMeters,
                 float proximityLockMeters,
                 boolean verboseLog
@@ -760,6 +866,7 @@ public class TailgAdBlockModule extends XposedModule {
             this.trimTrackEndpoints = trimTrackEndpoints;
             this.enableVehicleDiagnostics = enableVehicleDiagnostics;
             this.overrideProximityDistance = overrideProximityDistance;
+            this.showOfficialSettingsEntry = showOfficialSettingsEntry;
             this.proximityUnlockMeters = proximityUnlockMeters;
             this.proximityLockMeters = proximityLockMeters;
             this.verboseLog = verboseLog;
@@ -783,11 +890,17 @@ public class TailgAdBlockModule extends XposedModule {
                     ConfigKeys.DEFAULT_TRIM_TRACK_ENDPOINTS,
                     ConfigKeys.DEFAULT_ENABLE_VEHICLE_DIAGNOSTICS,
                     ConfigKeys.DEFAULT_OVERRIDE_PROXIMITY_DISTANCE,
+                    ConfigKeys.DEFAULT_SHOW_OFFICIAL_SETTINGS_ENTRY,
                     ConfigKeys.DEFAULT_PROXIMITY_UNLOCK_METERS,
                     ConfigKeys.DEFAULT_PROXIMITY_LOCK_METERS,
                     ConfigKeys.DEFAULT_VERBOSE_LOG
             );
         }
+    }
+
+    @FunctionalInterface
+    private interface SettingsEntryInstaller {
+        void install(Object target);
     }
 
     private static final class VersionInfo {

@@ -22,6 +22,7 @@ public class HookRequestPlanTest {
                 true,
                 true,
                 true,
+                true,
                 true
         );
 
@@ -37,7 +38,8 @@ public class HookRequestPlanTest {
         assertEquals(2, plan.homeActivityRequestCount());
         assertEquals(1, plan.trackExportRequestCount());
         assertEquals(2, plan.proximityRequestCount());
-        assertEquals(16, plan.totalRequestCount());
+        assertEquals(2, plan.officialSettingsRequestCount());
+        assertEquals(18, plan.totalRequestCount());
     }
 
     @Test
@@ -49,6 +51,7 @@ public class HookRequestPlanTest {
                 true,
                 true,
                 true,
+                false,
                 false,
                 false,
                 false,
@@ -82,6 +85,7 @@ public class HookRequestPlanTest {
                 false,
                 false,
                 false,
+                false,
                 false
         );
 
@@ -102,6 +106,7 @@ public class HookRequestPlanTest {
                 false,
                 false,
                 true,
+                false,
                 false,
                 false,
                 false,
@@ -132,6 +137,7 @@ public class HookRequestPlanTest {
                 false,
                 false,
                 false,
+                false,
                 false
         );
 
@@ -139,5 +145,29 @@ public class HookRequestPlanTest {
         assertFalse(plan.hasConfigBeanHooks());
         assertFalse(plan.hasAppUpdateHooks());
         assertEquals(0, plan.totalRequestCount());
+    }
+
+    @Test
+    public void officialSettingsEntry_countsRevisionAndLegacyHooks() {
+        HookRequestPlan plan = HookRequestPlan.fromConfig(
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true
+        );
+
+        assertTrue(plan.hasOfficialSettingsHooks());
+        assertEquals(2, plan.officialSettingsRequestCount());
+        assertEquals(2, plan.totalRequestCount());
     }
 }

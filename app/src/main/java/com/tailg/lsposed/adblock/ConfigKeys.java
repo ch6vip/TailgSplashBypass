@@ -4,6 +4,7 @@ final class ConfigKeys {
     static final String PREFS_NAME = "tailg_adblock";
     static final String KEY_ENABLE_MODULE = "enable_module";
     static final String KEY_STRICT_VERSION_GUARD = "strict_version_guard";
+    static final String KEY_SHOW_OFFICIAL_SETTINGS_ENTRY = "show_official_settings_entry";
     static final String KEY_HOOK_SETUP_VIEW = "hook_setup_view";
     static final String KEY_HOOK_COUNT_DOWN = "hook_count_down";
     static final String KEY_HOOK_CONFIG_BEAN = "hook_config_bean";
@@ -24,6 +25,7 @@ final class ConfigKeys {
 
     static final boolean DEFAULT_ENABLE_MODULE = true;
     static final boolean DEFAULT_STRICT_VERSION_GUARD = true;
+    static final boolean DEFAULT_SHOW_OFFICIAL_SETTINGS_ENTRY = true;
     static final boolean DEFAULT_HOOK_SETUP_VIEW = true;
     static final boolean DEFAULT_HOOK_COUNT_DOWN = true;
     static final boolean DEFAULT_HOOK_CONFIG_BEAN = true;
