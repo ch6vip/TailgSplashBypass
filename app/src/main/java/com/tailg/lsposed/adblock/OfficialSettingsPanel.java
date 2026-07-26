@@ -3,17 +3,8 @@ package com.tailg.lsposed.adblock;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.ComponentName;
-import android.content.Context;
-import android.content.Intent;
-import android.content.ServiceConnection;
 import android.graphics.Color;
 import android.graphics.Typeface;
-import android.os.Bundle;
-import android.os.Handler;
-import android.os.IBinder;
-import android.os.Looper;
-import android.os.RemoteException;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -27,6 +18,8 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.tencent.mmkv.MMKV;
+
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,47 +28,31 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.WeakHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 @SuppressLint({"SetTextI18n", "UseSwitchCompatOrMaterialCode"})
 final class OfficialSettingsPanel {
     private static final String TAG = "TailgSettingsPanel";
     private static final int DISTANCE_PROGRESS_MAX = 18;
-    private static final int SNAPSHOT_RETRY_LIMIT = 10;
-    private static final long SNAPSHOT_RETRY_DELAY_MS = 500L;
     private static final Map<Activity, WeakReference<AlertDialog>> OPEN_DIALOGS =
             Collections.synchronizedMap(new WeakHashMap<>());
 
     private final Activity activity;
+    private final MMKV preferences;
     private final List<ToggleSpec> specs = buildSpecs();
     private final Map<String, Switch> switches = new LinkedHashMap<>();
     private final Map<String, View> rows = new LinkedHashMap<>();
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final ExecutorService bridgeExecutor = Executors.newSingleThreadExecutor(runnable -> {
-        Thread thread = new Thread(runnable, "tailg-config-bridge");
-        thread.setDaemon(true);
-        return thread;
-    });
 
-    private volatile IConfigBridge bridge;
-    private ServiceConnection serviceConnection;
-    private Bundle snapshot;
-    private boolean bound;
-    private boolean bridgeReady;
     private boolean refreshing;
-    private boolean closed;
-    private int snapshotAttempts;
     private SeekBar unlockSeekBar;
     private SeekBar lockSeekBar;
     private TextView unlockValue;
     private TextView lockValue;
-    private TextView footer;
     private View unlockRow;
     private View lockRow;
 
     private OfficialSettingsPanel(Activity activity) {
         this.activity = activity;
+        this.preferences = HostConfigStore.open(activity);
     }
 
     static void show(Activity activity) {
@@ -88,16 +65,21 @@ final class OfficialSettingsPanel {
             return;
         }
 
-        OfficialSettingsPanel panel = new OfficialSettingsPanel(activity);
+        OfficialSettingsPanel panel;
+        try {
+            panel = new OfficialSettingsPanel(activity);
+        } catch (Throwable error) {
+            Log.e(TAG, "Open host MMKV settings failed", error);
+            Toast.makeText(activity, "无法打开 Tailg 工具箱配置", Toast.LENGTH_LONG).show();
+            return;
+        }
+
         AlertDialog dialog = new AlertDialog.Builder(activity)
                 .setTitle("Tailg 工具箱")
                 .setView(panel.createContent())
                 .setPositiveButton("关闭", null)
                 .create();
-        dialog.setOnDismissListener(ignored -> {
-            OPEN_DIALOGS.remove(activity);
-            panel.closeBridge();
-        });
+        dialog.setOnDismissListener(ignored -> OPEN_DIALOGS.remove(activity));
         OPEN_DIALOGS.put(activity, new WeakReference<>(dialog));
         dialog.show();
 
@@ -108,7 +90,6 @@ final class OfficialSettingsPanel {
             );
             window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, height);
         }
-        panel.connectBridge();
     }
 
     private View createContent() {
@@ -137,8 +118,8 @@ final class OfficialSettingsPanel {
             }
         }
 
-        footer = new TextView(activity);
-        footer.setText("正在连接 LSPosed 配置服务...");
+        TextView footer = new TextView(activity);
+        footer.setText("设置已保存在官方 App，重启后生效");
         footer.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.0f);
         footer.setAlpha(0.62f);
         footer.setGravity(Gravity.CENTER);
@@ -153,7 +134,7 @@ final class OfficialSettingsPanel {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
-        refreshFromSnapshot(null);
+        refreshFromPreferences();
         return scroll;
     }
 
@@ -303,121 +284,29 @@ final class OfficialSettingsPanel {
         return row;
     }
 
-    private void connectBridge() {
-        serviceConnection = new ServiceConnection() {
-            @Override
-            public void onServiceConnected(ComponentName name, IBinder service) {
-                if (closed) {
-                    return;
-                }
-                IConfigBridge connectedBridge = IConfigBridge.Stub.asInterface(service);
-                bridge = connectedBridge;
-                snapshotAttempts = 0;
-                requestSnapshot(connectedBridge);
-            }
-
-            @Override
-            public void onServiceDisconnected(ComponentName name) {
-                markBridgeUnavailable("配置服务连接已断开");
-            }
-
-            @Override
-            public void onBindingDied(ComponentName name) {
-                markBridgeUnavailable("配置服务连接已断开");
-            }
-
-            @Override
-            public void onNullBinding(ComponentName name) {
-                markBridgeUnavailable("配置服务不可用");
-            }
-        };
-
-        Intent intent = new Intent();
-        intent.setComponent(new ComponentName(
-                ConfigBridgeService.MODULE_PACKAGE,
-                ConfigBridgeService.SERVICE_CLASS
-        ));
-        try {
-            bound = activity.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
-            if (!bound) {
-                markBridgeUnavailable("无法连接模块配置服务");
-            }
-        } catch (RuntimeException error) {
-            Log.w(TAG, "Bind config service failed", error);
-            markBridgeUnavailable("无法连接模块配置服务");
-        }
-    }
-
-    private void requestSnapshot(IConfigBridge requestedBridge) {
-        if (closed || requestedBridge == null || requestedBridge != bridge) {
-            return;
-        }
-        bridgeReady = false;
-        applyGating();
-        updateFooter("正在连接 LSPosed 配置服务...");
-        submitBridgeTask(() -> {
-            Bundle values = null;
-            try {
-                values = requestedBridge.getSnapshot();
-            } catch (RemoteException | RuntimeException error) {
-                Log.w(TAG, "Read settings snapshot failed", error);
-            }
-            Bundle loadedValues = values;
-            mainHandler.post(() -> handleSnapshot(requestedBridge, loadedValues));
-        });
-    }
-
-    private void handleSnapshot(IConfigBridge requestedBridge, Bundle values) {
-        if (closed || requestedBridge != bridge) {
-            return;
-        }
-        if (values != null) {
-            snapshotAttempts = 0;
-            snapshot = new Bundle(values);
-            bridgeReady = true;
-            refreshFromSnapshot(values);
-            updateFooter("设置即时保存，重启官方 App 后生效");
-            return;
-        }
-
-        bridgeReady = false;
-        applyGating();
-        snapshotAttempts++;
-        if (snapshotAttempts < SNAPSHOT_RETRY_LIMIT) {
-            mainHandler.postDelayed(
-                    () -> requestSnapshot(requestedBridge),
-                    SNAPSHOT_RETRY_DELAY_MS
-            );
-        } else {
-            updateFooter("LSPosed 配置服务不可用");
-        }
-    }
-
-    private void refreshFromSnapshot(Bundle values) {
+    private void refreshFromPreferences() {
         refreshing = true;
         try {
             for (ToggleSpec spec : specs) {
                 Switch toggle = switches.get(spec.key);
                 if (toggle != null) {
-                    boolean value = values == null
-                            ? spec.defaultValue
-                            : values.getBoolean(spec.key, spec.defaultValue);
-                    toggle.setChecked(value);
+                    toggle.setChecked(preferences.getBoolean(spec.key, spec.defaultValue));
                 }
             }
-            float unlock = values == null
-                    ? ConfigKeys.DEFAULT_PROXIMITY_UNLOCK_METERS
-                    : values.getFloat(
+            ProximityPolicy.Distances distances = ProximityPolicy.normalize(
+                    preferences.getFloat(
                             ConfigKeys.KEY_PROXIMITY_UNLOCK_METERS,
                             ConfigKeys.DEFAULT_PROXIMITY_UNLOCK_METERS
-                    );
-            float lock = values == null
-                    ? ConfigKeys.DEFAULT_PROXIMITY_LOCK_METERS
-                    : values.getFloat(
+                    ),
+                    preferences.getFloat(
                             ConfigKeys.KEY_PROXIMITY_LOCK_METERS,
                             ConfigKeys.DEFAULT_PROXIMITY_LOCK_METERS
-                    );
-            setDistanceProgress(ProximityPolicy.normalize(unlock, lock));
+                    )
+            );
+            setDistanceProgress(distances);
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Read host settings failed", error);
+            Toast.makeText(activity, "读取配置失败", Toast.LENGTH_SHORT).show();
         } finally {
             refreshing = false;
         }
@@ -426,41 +315,21 @@ final class OfficialSettingsPanel {
     }
 
     private void persistBoolean(String key, boolean value) {
-        IConfigBridge currentBridge = bridge;
-        if (!bridgeReady || currentBridge == null) {
-            requestSnapshot(currentBridge);
+        if (!ConfigKeys.isBooleanKey(key)) {
             return;
         }
-        submitBridgeTask(() -> {
-            boolean saved = false;
-            try {
-                saved = currentBridge.putBoolean(key, value);
-            } catch (RemoteException | RuntimeException error) {
-                Log.w(TAG, "Write boolean setting failed: " + key, error);
+        try {
+            if (!preferences.encode(key, value)) {
+                throw new IllegalStateException("MMKV encode returned false");
             }
-            boolean saveResult = saved;
-            mainHandler.post(() -> {
-                if (closed || currentBridge != bridge) {
-                    return;
-                }
-                if (saveResult) {
-                    if (snapshot != null) {
-                        snapshot.putBoolean(key, value);
-                    }
-                } else {
-                    Toast.makeText(activity, "保存模块配置失败", Toast.LENGTH_SHORT).show();
-                    requestSnapshot(currentBridge);
-                }
-            });
-        });
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Write host boolean setting failed: " + key, error);
+            Toast.makeText(activity, "保存模块配置失败", Toast.LENGTH_SHORT).show();
+            refreshFromPreferences();
+        }
     }
 
     private void persistDistances(boolean unlockChanged) {
-        IConfigBridge currentBridge = bridge;
-        if (!bridgeReady || currentBridge == null) {
-            requestSnapshot(currentBridge);
-            return;
-        }
         float unlock = unlockFromProgress(unlockSeekBar.getProgress());
         float lock = lockFromProgress(lockSeekBar.getProgress());
         if (unlockChanged && lock < unlock + ProximityPolicy.STEP_METERS) {
@@ -471,38 +340,24 @@ final class OfficialSettingsPanel {
         ProximityPolicy.Distances distances = ProximityPolicy.normalize(unlock, lock);
         setDistanceProgress(distances);
         updateDistanceLabels();
-        submitBridgeTask(() -> {
-            boolean saved = false;
-            try {
-                saved = currentBridge.putDistances(
-                        distances.unlockMeters,
-                        distances.lockMeters
-                );
-            } catch (RemoteException | RuntimeException error) {
-                Log.w(TAG, "Write distance settings failed", error);
+
+        try {
+            boolean unlockSaved = preferences.encode(
+                    ConfigKeys.KEY_PROXIMITY_UNLOCK_METERS,
+                    distances.unlockMeters
+            );
+            boolean lockSaved = preferences.encode(
+                    ConfigKeys.KEY_PROXIMITY_LOCK_METERS,
+                    distances.lockMeters
+            );
+            if (!unlockSaved || !lockSaved) {
+                throw new IllegalStateException("MMKV encode returned false");
             }
-            boolean saveResult = saved;
-            mainHandler.post(() -> {
-                if (closed || currentBridge != bridge) {
-                    return;
-                }
-                if (saveResult) {
-                    if (snapshot != null) {
-                        snapshot.putFloat(
-                                ConfigKeys.KEY_PROXIMITY_UNLOCK_METERS,
-                                distances.unlockMeters
-                        );
-                        snapshot.putFloat(
-                                ConfigKeys.KEY_PROXIMITY_LOCK_METERS,
-                                distances.lockMeters
-                        );
-                    }
-                } else {
-                    Toast.makeText(activity, "保存距离配置失败", Toast.LENGTH_SHORT).show();
-                    requestSnapshot(currentBridge);
-                }
-            });
-        });
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Write host distance settings failed", error);
+            Toast.makeText(activity, "保存距离配置失败", Toast.LENGTH_SHORT).show();
+            refreshFromPreferences();
+        }
     }
 
     private void setDistanceProgress(ProximityPolicy.Distances distances) {
@@ -551,13 +406,11 @@ final class OfficialSettingsPanel {
     }
 
     private void applyGating() {
-        boolean writable = bridgeReady && bridge != null;
         Switch masterSwitch = switches.get(ConfigKeys.KEY_ENABLE_MODULE);
-        boolean masterEnabled = writable && masterSwitch != null && masterSwitch.isChecked();
+        boolean masterEnabled = masterSwitch != null && masterSwitch.isChecked();
         for (ToggleSpec spec : specs) {
             boolean enabled = ConfigKeys.KEY_ENABLE_MODULE.equals(spec.key)
-                    ? writable
-                    : masterEnabled && (spec.dependsOn == null || isChecked(spec.dependsOn));
+                    || masterEnabled && (spec.dependsOn == null || isChecked(spec.dependsOn));
             Switch toggle = switches.get(spec.key);
             View row = rows.get(spec.key);
             if (toggle != null) {
@@ -591,64 +444,6 @@ final class OfficialSettingsPanel {
         }
     }
 
-    private void markBridgeUnavailable(String message) {
-        bridge = null;
-        bridgeReady = false;
-        if (closed) {
-            return;
-        }
-        applyGating();
-        updateFooter(message);
-    }
-
-    private void submitBridgeTask(Runnable task) {
-        if (closed) {
-            return;
-        }
-        try {
-            bridgeExecutor.execute(task);
-        } catch (RuntimeException error) {
-            if (!closed) {
-                Log.w(TAG, "Submit config bridge task failed", error);
-                markBridgeUnavailable("配置服务不可用");
-            }
-        }
-    }
-
-    private void updateFooter(String text) {
-        if (footer != null) {
-            footer.setText(text);
-        }
-    }
-
-    private void closeBridge() {
-        if (closed) {
-            return;
-        }
-        closed = true;
-        bridgeReady = false;
-        bridge = null;
-        mainHandler.removeCallbacksAndMessages(null);
-        try {
-            bridgeExecutor.execute(() -> mainHandler.post(this::unbindBridge));
-        } catch (RuntimeException error) {
-            Log.w(TAG, "Queue config bridge cleanup failed", error);
-            unbindBridge();
-        }
-        bridgeExecutor.shutdown();
-    }
-
-    private void unbindBridge() {
-        if (bound && serviceConnection != null) {
-            try {
-                activity.unbindService(serviceConnection);
-            } catch (RuntimeException error) {
-                Log.w(TAG, "Unbind config service failed", error);
-            }
-        }
-        bound = false;
-    }
-
     private List<ToggleSpec> specsForGroup(Group group) {
         List<ToggleSpec> result = new ArrayList<>();
         for (ToggleSpec spec : specs) {
@@ -662,7 +457,7 @@ final class OfficialSettingsPanel {
     private List<ToggleSpec> buildSpecs() {
         List<ToggleSpec> result = new ArrayList<>();
         add(result, ConfigKeys.KEY_ENABLE_MODULE, "启用模块",
-                "关闭后下次启动不安装任何 Hook", ConfigKeys.DEFAULT_ENABLE_MODULE,
+                "关闭后下次启动不安装功能 Hook", ConfigKeys.DEFAULT_ENABLE_MODULE,
                 Group.GENERAL, null);
         add(result, ConfigKeys.KEY_STRICT_VERSION_GUARD, "仅支持版本启用",
                 "只对已验证的官方 App 3.5.9 注入", ConfigKeys.DEFAULT_STRICT_VERSION_GUARD,

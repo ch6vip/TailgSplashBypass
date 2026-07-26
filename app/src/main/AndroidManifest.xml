@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
         android:name=".ModuleApplication"
         android:allowBackup="false"
         android:hasCode="true"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.TailgAdblock">
+        android:theme="@android:style/Theme.Translucent.NoTitleBar">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -17,9 +16,5 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <service
-            android:name=".ConfigBridgeService"
-            android:exported="true"
-            tools:ignore="ExportedService" />
     </application>
 </manifest>

@@ -3,6 +3,7 @@ package com.tailg.lsposed.adblock;
 import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -17,6 +18,8 @@ import java.lang.reflect.Modifier;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+
+import com.tencent.mmkv.MMKV;
 
 import io.github.libxposed.api.XposedInterface.ExceptionMode;
 import io.github.libxposed.api.XposedInterface.HookHandle;
@@ -54,16 +57,10 @@ public class TailgAdBlockModule extends XposedModule {
             return;
         }
 
-        ModuleConfig config = readConfig();
-        if (!config.enableModule) {
-            log(Log.INFO, TAG, "Module disabled by config.");
-            return;
-        }
-
-        scheduleHookInitialization(param, config);
+        scheduleHookInitialization(param);
     }
 
-    private void scheduleHookInitialization(PackageReadyParam param, ModuleConfig config) {
+    private void scheduleHookInitialization(PackageReadyParam param) {
         try {
             Method attachMethod = Application.class.getDeclaredMethod("attach", Context.class);
             AtomicReference<HookHandle> attachHook = new AtomicReference<>();
@@ -71,6 +68,7 @@ public class TailgAdBlockModule extends XposedModule {
                     .setPriority(PRIORITY_HIGHEST)
                     .setExceptionMode(ExceptionMode.PROTECTIVE)
                     .intercept(chain -> {
+                        Object result = chain.proceed();
                         Object contextArg = chain.getArg(0);
                         if (contextArg instanceof Context context
                                 && TARGET_PACKAGE.equals(context.getPackageName())) {
@@ -78,14 +76,92 @@ public class TailgAdBlockModule extends XposedModule {
                             if (currentHandle != null) {
                                 currentHandle.unhook();
                             }
-                            initializeHooks(param.getClassLoader(), context, config);
+                            initializeHostProcess(param.getClassLoader(), context);
                         }
-                        return chain.proceed();
+                        return result;
                     });
             attachHook.set(handle);
         } catch (Throwable t) {
             log(Log.ERROR, TAG, "Schedule hook initialization failed", t);
         }
+    }
+
+    private void initializeHostProcess(ClassLoader classLoader, Context context) {
+        ModuleConfig config = ModuleConfig.defaults();
+        try {
+            MMKV hostPreferences = HostConfigStore.open(context);
+            migrateLegacyConfig(hostPreferences);
+            config = readConfig(hostPreferences);
+        } catch (Throwable error) {
+            log(Log.ERROR, TAG, "Initialize host MMKV settings failed", error);
+        }
+
+        installToolboxLauncherHooks();
+        if (!config.enableModule) {
+            log(Log.INFO, TAG, "Module disabled by config; toolbox launcher remains available.");
+            return;
+        }
+        initializeHooks(classLoader, context, config);
+    }
+
+    private void migrateLegacyConfig(MMKV hostPreferences) {
+        try {
+            SharedPreferences legacy = getRemotePreferences(ConfigKeys.PREFS_NAME);
+            if (legacy != null) {
+                HostConfigStore.migrateFrom(hostPreferences, legacy);
+            }
+        } catch (Throwable error) {
+            log(Log.WARN, TAG, "Legacy remote settings migration deferred", error);
+        }
+    }
+
+    private void installToolboxLauncherHooks() {
+        try {
+            Method onPostResume = Activity.class.getDeclaredMethod("onPostResume");
+            hook(onPostResume)
+                    .setPriority(PRIORITY_HIGHEST)
+                    .setExceptionMode(ExceptionMode.PROTECTIVE)
+                    .intercept(chain -> {
+                        Object result = chain.proceed();
+                        Object target = chain.getThisObject();
+                        if (target instanceof Activity activity) {
+                            consumeToolboxRequest(activity, activity.getIntent());
+                        }
+                        return result;
+                    });
+        } catch (Throwable error) {
+            log(Log.ERROR, TAG, "Install toolbox resume hook failed", error);
+        }
+
+        try {
+            Method onNewIntent = Activity.class.getDeclaredMethod("onNewIntent", Intent.class);
+            hook(onNewIntent)
+                    .setPriority(PRIORITY_HIGHEST)
+                    .setExceptionMode(ExceptionMode.PROTECTIVE)
+                    .intercept(chain -> {
+                        Object result = chain.proceed();
+                        Object target = chain.getThisObject();
+                        Object intentArg = chain.getArg(0);
+                        if (target instanceof Activity activity && intentArg instanceof Intent intent) {
+                            consumeToolboxRequest(activity, intent);
+                        }
+                        return result;
+                    });
+        } catch (Throwable error) {
+            log(Log.ERROR, TAG, "Install toolbox new-intent hook failed", error);
+        }
+    }
+
+    private void consumeToolboxRequest(Activity activity, Intent intent) {
+        if (!TARGET_PACKAGE.equals(activity.getPackageName())
+                || intent == null
+                || !intent.getBooleanExtra(MainActivity.EXTRA_OPEN_TOOLBOX, false)) {
+            return;
+        }
+        intent.removeExtra(MainActivity.EXTRA_OPEN_TOOLBOX);
+        activity.setIntent(intent);
+        View decorView = activity.getWindow().getDecorView();
+        decorView.post(() -> OfficialSettingsPanel.show(activity));
     }
 
     private void initializeHooks(ClassLoader classLoader, Context context, ModuleConfig config) {
@@ -705,19 +781,8 @@ public class TailgAdBlockModule extends XposedModule {
         log(Log.INFO, TAG, summary);
     }
 
-    private ModuleConfig readConfig() {
-        SharedPreferences prefs = null;
-        try {
-            prefs = getRemotePreferences(ConfigKeys.PREFS_NAME);
-        } catch (Throwable t) {
-            log(Log.WARN, TAG, "Read remote preferences failed, fallback to defaults", t);
-        }
-
+    private ModuleConfig readConfig(SharedPreferences prefs) {
         ModuleConfig defaults = ModuleConfig.defaults();
-        if (prefs == null) {
-            return defaults;
-        }
-
         try {
             ProximityPolicy.Distances distances = ProximityPolicy.normalize(
                     prefs.getFloat(
@@ -761,7 +826,7 @@ public class TailgAdBlockModule extends XposedModule {
                     prefs.getBoolean(ConfigKeys.KEY_VERBOSE_LOG, defaults.verboseLog)
             );
         } catch (Throwable t) {
-            log(Log.WARN, TAG, "Read remote preference values failed, fallback to defaults", t);
+            log(Log.WARN, TAG, "Read host MMKV settings failed, fallback to defaults", t);
             return defaults;
         }
     }
