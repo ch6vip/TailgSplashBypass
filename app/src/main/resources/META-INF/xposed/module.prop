@@ -1,5 +1,5 @@
 minApiVersion=101
 targetApiVersion=101
 staticScope=true
-name=Tailg AdBlock
-description=Disable splash ads, home banners, and app update popups for com.tailg.run.intelligence
+name=Tailg LSPosed Toolkit
+description=Privacy, track export, diagnostics, home cleanup, proximity thresholds, and ad blocking for Tailg 3.5.9

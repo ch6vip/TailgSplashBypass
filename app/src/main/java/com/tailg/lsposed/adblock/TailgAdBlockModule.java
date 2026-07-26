@@ -1,5 +1,6 @@
 package com.tailg.lsposed.adblock;
 
+import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -11,6 +12,7 @@ import android.util.Log;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -27,6 +29,14 @@ public class TailgAdBlockModule extends XposedModule {
             "com.tailg.run.intelligence.model.home.bean.ConfigGetBean";
     private static final String CHECK_APP_VERSION_BEAN =
             "com.tailg.run.intelligence.model.mine_setting.bean.CheckAppVersionBean";
+    private static final String TAILG_REPOSITORY =
+            "com.tailg.run.intelligence.net.TailgRepository";
+    private static final String HOME_ACTIVITY =
+            "com.tailg.run.intelligence.model.home.activity.HomeActivity";
+    private static final String TRACK_DETAIL_ACTIVITY =
+            "com.tailg.run.intelligence.model.mine_historical_track.activity.TrackDetailActivity";
+    private static final String CAR_CONTROL_INFO_BEAN =
+            "com.tailg.run.intelligence.model.home.bean.CarControlInfoBean";
 
     private final AtomicBoolean initializationScheduled = new AtomicBoolean(false);
 
@@ -98,7 +108,13 @@ public class TailgAdBlockModule extends XposedModule {
                 config.forceEmptyRes,
                 config.forceDurationZero,
                 config.forceEmptyBanner,
-                config.hookAppUpdate
+                config.hookAppUpdate,
+                config.blockUsageReport,
+                config.blockBugly,
+                config.simplifyHomeNav,
+                config.enableVehicleDiagnostics,
+                config.enableTrackExport,
+                config.overrideProximityDistance
         );
         HookInstallReport report = new HookInstallReport();
         report.markRequested(requestPlan.totalRequestCount());
@@ -124,6 +140,38 @@ public class TailgAdBlockModule extends XposedModule {
                         classLoader,
                         config,
                         requestPlan.appUpdateRequestCount(),
+                        report
+                );
+            }
+            if (requestPlan.hasRepositoryHooks()) {
+                installRepositoryHooks(
+                        classLoader,
+                        config,
+                        requestPlan.repositoryRequestCount(),
+                        report
+                );
+            }
+            if (requestPlan.hasHomeActivityHooks()) {
+                installHomeActivityHooks(
+                        classLoader,
+                        config,
+                        requestPlan.homeActivityRequestCount(),
+                        report
+                );
+            }
+            if (requestPlan.hasTrackExportHooks()) {
+                installTrackExportHooks(
+                        classLoader,
+                        config,
+                        requestPlan.trackExportRequestCount(),
+                        report
+                );
+            }
+            if (requestPlan.hasProximityHooks()) {
+                installProximityHooks(
+                        classLoader,
+                        config,
+                        requestPlan.proximityRequestCount(),
                         report
                 );
             }
@@ -215,6 +263,184 @@ public class TailgAdBlockModule extends XposedModule {
         hookStringMethod(beanClazz, "getIsForce", "0", config.verboseLog, report);
     }
 
+    private void installRepositoryHooks(
+            ClassLoader classLoader,
+            ModuleConfig config,
+            int requestCount,
+            HookInstallReport report
+    ) {
+        Class<?> repositoryClass = tryLoadClass(
+                classLoader,
+                TAILG_REPOSITORY,
+                "TailgRepository",
+                requestCount,
+                report
+        );
+        if (repositoryClass == null) {
+            return;
+        }
+        Method collectReport = findMethod(
+                repositoryClass,
+                "collectReport",
+                String.class,
+                List.class
+        );
+        if (collectReport == null) {
+            report.markSkipped();
+            return;
+        }
+
+        try {
+            Class<?> observableClass = Class.forName("io.reactivex.Observable", false, classLoader);
+            Object emptyObservable = observableClass.getDeclaredMethod("empty").invoke(null);
+            if (!collectReport.getReturnType().isInstance(emptyObservable)) {
+                report.markSkipped();
+                log(Log.WARN, TAG, "Unexpected TailgRepository#collectReport return type");
+                return;
+            }
+            hook(collectReport)
+                    .setPriority(PRIORITY_HIGHEST)
+                    .setExceptionMode(ExceptionMode.PROTECTIVE)
+                    .intercept(chain -> emptyObservable);
+            report.markInstalled();
+            if (config.verboseLog) {
+                log(Log.INFO, TAG, "Hooked TailgRepository#collectReport => Observable.empty()");
+            }
+        } catch (Throwable error) {
+            report.markFailed();
+            log(Log.ERROR, TAG, "Install usage report hook failed", error);
+        }
+    }
+
+    private void installHomeActivityHooks(
+            ClassLoader classLoader,
+            ModuleConfig config,
+            int requestCount,
+            HookInstallReport report
+    ) {
+        Class<?> homeClass = tryLoadClass(
+                classLoader,
+                HOME_ACTIVITY,
+                "HomeActivity",
+                requestCount,
+                report
+        );
+        if (homeClass == null) {
+            return;
+        }
+        if (config.blockBugly) {
+            installVoidBlockHook(homeClass, "initTencentBugly", config.verboseLog, report);
+        }
+        if (config.simplifyHomeNav || config.enableVehicleDiagnostics) {
+            Method setupFragment = findNoArgMethod(homeClass, "setupFragment");
+            if (setupFragment == null || setupFragment.getReturnType() != Void.TYPE) {
+                report.markSkipped();
+                return;
+            }
+            try {
+                hook(setupFragment)
+                        .setPriority(PRIORITY_HIGHEST)
+                        .setExceptionMode(ExceptionMode.PROTECTIVE)
+                        .intercept(chain -> {
+                            Object result = chain.proceed();
+                            Object target = chain.getThisObject();
+                            if (target instanceof Activity activity) {
+                                HomeEnhancementController.apply(
+                                        activity,
+                                        classLoader,
+                                        config.simplifyHomeNav,
+                                        config.enableVehicleDiagnostics,
+                                        config.overrideProximityDistance,
+                                        config.proximityUnlockMeters,
+                                        config.proximityLockMeters
+                                );
+                            }
+                            return result;
+                        });
+                report.markInstalled();
+            } catch (Throwable error) {
+                report.markFailed();
+                log(Log.ERROR, TAG, "Install HomeActivity enhancement hook failed", error);
+            }
+        }
+    }
+
+    private void installTrackExportHooks(
+            ClassLoader classLoader,
+            ModuleConfig config,
+            int requestCount,
+            HookInstallReport report
+    ) {
+        Class<?> trackClass = tryLoadClass(
+                classLoader,
+                TRACK_DETAIL_ACTIVITY,
+                "TrackDetailActivity",
+                requestCount,
+                report
+        );
+        if (trackClass == null) {
+            return;
+        }
+        Method setEventListener = findNoArgMethod(trackClass, "setEventListener");
+        if (setEventListener == null || setEventListener.getReturnType() != Void.TYPE) {
+            report.markSkipped();
+            return;
+        }
+        try {
+            hook(setEventListener)
+                    .setPriority(PRIORITY_HIGHEST)
+                    .setExceptionMode(ExceptionMode.PROTECTIVE)
+                    .intercept(chain -> {
+                        Object result = chain.proceed();
+                        Object target = chain.getThisObject();
+                        if (target instanceof Activity activity) {
+                            TrackExportController.install(
+                                    activity,
+                                    classLoader,
+                                    config.trimTrackEndpoints
+                            );
+                        }
+                        return result;
+                    });
+            report.markInstalled();
+        } catch (Throwable error) {
+            report.markFailed();
+            log(Log.ERROR, TAG, "Install track export hook failed", error);
+        }
+    }
+
+    private void installProximityHooks(
+            ClassLoader classLoader,
+            ModuleConfig config,
+            int requestCount,
+            HookInstallReport report
+    ) {
+        Class<?> beanClass = tryLoadClass(
+                classLoader,
+                CAR_CONTROL_INFO_BEAN,
+                "CarControlInfoBean",
+                requestCount,
+                report
+        );
+        if (beanClass == null) {
+            return;
+        }
+        hookStringMethod(
+                beanClass,
+                "getMinRssiDistance",
+                Float.toString(config.proximityUnlockMeters),
+                config.verboseLog,
+                report
+        );
+        hookStringMethod(
+                beanClass,
+                "getMaxRssiDistance",
+                Float.toString(config.proximityLockMeters),
+                config.verboseLog,
+                report
+        );
+    }
+
     private Class<?> tryLoadClass(
             ClassLoader classLoader,
             String className,
@@ -289,6 +515,39 @@ public class TailgAdBlockModule extends XposedModule {
         }
     }
 
+    private void installVoidBlockHook(
+            Class<?> targetClazz,
+            String methodName,
+            boolean verboseLog,
+            HookInstallReport report
+    ) {
+        Method method = findNoArgMethod(targetClazz, methodName);
+        if (method == null) {
+            report.markSkipped();
+            return;
+        }
+        if (method.getReturnType() != Void.TYPE || Modifier.isStatic(method.getModifiers())) {
+            report.markSkipped();
+            log(Log.WARN, TAG, "Incompatible void method: "
+                    + targetClazz.getSimpleName() + "#" + methodName);
+            return;
+        }
+        try {
+            hook(method)
+                    .setPriority(PRIORITY_HIGHEST)
+                    .setExceptionMode(ExceptionMode.PROTECTIVE)
+                    .intercept(chain -> null);
+            report.markInstalled();
+            if (verboseLog) {
+                log(Log.INFO, TAG, "Blocked " + targetClazz.getSimpleName() + "#" + methodName);
+            }
+        } catch (Throwable error) {
+            report.markFailed();
+            log(Log.ERROR, TAG, "Install void block hook failed: "
+                    + targetClazz.getSimpleName() + "#" + methodName, error);
+        }
+    }
+
     private void hookStringMethod(
             Class<?> targetClazz,
             String methodName,
@@ -323,8 +582,12 @@ public class TailgAdBlockModule extends XposedModule {
     }
 
     private Method findNoArgMethod(Class<?> targetClazz, String methodName) {
+        return findMethod(targetClazz, methodName);
+    }
+
+    private Method findMethod(Class<?> targetClazz, String methodName, Class<?>... parameterTypes) {
         try {
-            return targetClazz.getDeclaredMethod(methodName);
+            return targetClazz.getDeclaredMethod(methodName, parameterTypes);
         } catch (NoSuchMethodException e) {
             log(Log.WARN, TAG, "Method missing: " + targetClazz.getSimpleName() + "#" + methodName);
             return null;
@@ -357,6 +620,16 @@ public class TailgAdBlockModule extends XposedModule {
         }
 
         try {
+            ProximityPolicy.Distances distances = ProximityPolicy.normalize(
+                    prefs.getFloat(
+                            ConfigKeys.KEY_PROXIMITY_UNLOCK_METERS,
+                            defaults.proximityUnlockMeters
+                    ),
+                    prefs.getFloat(
+                            ConfigKeys.KEY_PROXIMITY_LOCK_METERS,
+                            defaults.proximityLockMeters
+                    )
+            );
             return new ModuleConfig(
                     prefs.getBoolean(ConfigKeys.KEY_ENABLE_MODULE, defaults.enableModule),
                     prefs.getBoolean(ConfigKeys.KEY_STRICT_VERSION_GUARD, defaults.strictVersionGuard),
@@ -367,6 +640,21 @@ public class TailgAdBlockModule extends XposedModule {
                     prefs.getBoolean(ConfigKeys.KEY_FORCE_DURATION_ZERO, defaults.forceDurationZero),
                     prefs.getBoolean(ConfigKeys.KEY_FORCE_EMPTY_BANNER, defaults.forceEmptyBanner),
                     prefs.getBoolean(ConfigKeys.KEY_HOOK_APP_UPDATE, defaults.hookAppUpdate),
+                    prefs.getBoolean(ConfigKeys.KEY_BLOCK_USAGE_REPORT, defaults.blockUsageReport),
+                    prefs.getBoolean(ConfigKeys.KEY_BLOCK_BUGLY, defaults.blockBugly),
+                    prefs.getBoolean(ConfigKeys.KEY_SIMPLIFY_HOME_NAV, defaults.simplifyHomeNav),
+                    prefs.getBoolean(ConfigKeys.KEY_ENABLE_TRACK_EXPORT, defaults.enableTrackExport),
+                    prefs.getBoolean(ConfigKeys.KEY_TRIM_TRACK_ENDPOINTS, defaults.trimTrackEndpoints),
+                    prefs.getBoolean(
+                            ConfigKeys.KEY_ENABLE_VEHICLE_DIAGNOSTICS,
+                            defaults.enableVehicleDiagnostics
+                    ),
+                    prefs.getBoolean(
+                            ConfigKeys.KEY_OVERRIDE_PROXIMITY_DISTANCE,
+                            defaults.overrideProximityDistance
+                    ),
+                    distances.unlockMeters,
+                    distances.lockMeters,
                     prefs.getBoolean(ConfigKeys.KEY_VERBOSE_LOG, defaults.verboseLog)
             );
         } catch (Throwable t) {
@@ -424,6 +712,15 @@ public class TailgAdBlockModule extends XposedModule {
         final boolean forceDurationZero;
         final boolean forceEmptyBanner;
         final boolean hookAppUpdate;
+        final boolean blockUsageReport;
+        final boolean blockBugly;
+        final boolean simplifyHomeNav;
+        final boolean enableTrackExport;
+        final boolean trimTrackEndpoints;
+        final boolean enableVehicleDiagnostics;
+        final boolean overrideProximityDistance;
+        final float proximityUnlockMeters;
+        final float proximityLockMeters;
         final boolean verboseLog;
 
         ModuleConfig(
@@ -436,6 +733,15 @@ public class TailgAdBlockModule extends XposedModule {
                 boolean forceDurationZero,
                 boolean forceEmptyBanner,
                 boolean hookAppUpdate,
+                boolean blockUsageReport,
+                boolean blockBugly,
+                boolean simplifyHomeNav,
+                boolean enableTrackExport,
+                boolean trimTrackEndpoints,
+                boolean enableVehicleDiagnostics,
+                boolean overrideProximityDistance,
+                float proximityUnlockMeters,
+                float proximityLockMeters,
                 boolean verboseLog
         ) {
             this.enableModule = enableModule;
@@ -447,6 +753,15 @@ public class TailgAdBlockModule extends XposedModule {
             this.forceDurationZero = forceDurationZero;
             this.forceEmptyBanner = forceEmptyBanner;
             this.hookAppUpdate = hookAppUpdate;
+            this.blockUsageReport = blockUsageReport;
+            this.blockBugly = blockBugly;
+            this.simplifyHomeNav = simplifyHomeNav;
+            this.enableTrackExport = enableTrackExport;
+            this.trimTrackEndpoints = trimTrackEndpoints;
+            this.enableVehicleDiagnostics = enableVehicleDiagnostics;
+            this.overrideProximityDistance = overrideProximityDistance;
+            this.proximityUnlockMeters = proximityUnlockMeters;
+            this.proximityLockMeters = proximityLockMeters;
             this.verboseLog = verboseLog;
         }
 
@@ -461,6 +776,15 @@ public class TailgAdBlockModule extends XposedModule {
                     ConfigKeys.DEFAULT_FORCE_DURATION_ZERO,
                     ConfigKeys.DEFAULT_FORCE_EMPTY_BANNER,
                     ConfigKeys.DEFAULT_HOOK_APP_UPDATE,
+                    ConfigKeys.DEFAULT_BLOCK_USAGE_REPORT,
+                    ConfigKeys.DEFAULT_BLOCK_BUGLY,
+                    ConfigKeys.DEFAULT_SIMPLIFY_HOME_NAV,
+                    ConfigKeys.DEFAULT_ENABLE_TRACK_EXPORT,
+                    ConfigKeys.DEFAULT_TRIM_TRACK_ENDPOINTS,
+                    ConfigKeys.DEFAULT_ENABLE_VEHICLE_DIAGNOSTICS,
+                    ConfigKeys.DEFAULT_OVERRIDE_PROXIMITY_DISTANCE,
+                    ConfigKeys.DEFAULT_PROXIMITY_UNLOCK_METERS,
+                    ConfigKeys.DEFAULT_PROXIMITY_LOCK_METERS,
                     ConfigKeys.DEFAULT_VERBOSE_LOG
             );
         }

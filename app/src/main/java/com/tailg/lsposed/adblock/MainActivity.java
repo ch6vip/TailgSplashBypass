@@ -14,6 +14,7 @@ import androidx.annotation.Nullable;
 import com.google.android.material.appbar.CollapsingToolbarLayout;
 import com.google.android.material.color.DynamicColors;
 import com.google.android.material.materialswitch.MaterialSwitch;
+import com.google.android.material.slider.Slider;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -40,6 +41,12 @@ public class MainActivity extends AppCompatActivity implements ModuleApplication
     private final Map<String, MaterialSwitch> switches = new LinkedHashMap<>();
     private final Map<String, View> rows = new LinkedHashMap<>();
     private final List<ToggleSpec> specs = buildSpecs();
+    private Slider unlockDistanceSlider;
+    private Slider lockDistanceSlider;
+    private TextView unlockDistanceValue;
+    private TextView lockDistanceValue;
+    private View unlockDistanceRow;
+    private View lockDistanceRow;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -106,6 +113,26 @@ public class MainActivity extends AppCompatActivity implements ModuleApplication
                 hasLegacyValues = true;
             }
         }
+        if (legacyPrefs.contains(ConfigKeys.KEY_PROXIMITY_UNLOCK_METERS)) {
+            editor.putFloat(
+                    ConfigKeys.KEY_PROXIMITY_UNLOCK_METERS,
+                    legacyPrefs.getFloat(
+                            ConfigKeys.KEY_PROXIMITY_UNLOCK_METERS,
+                            ConfigKeys.DEFAULT_PROXIMITY_UNLOCK_METERS
+                    )
+            );
+            hasLegacyValues = true;
+        }
+        if (legacyPrefs.contains(ConfigKeys.KEY_PROXIMITY_LOCK_METERS)) {
+            editor.putFloat(
+                    ConfigKeys.KEY_PROXIMITY_LOCK_METERS,
+                    legacyPrefs.getFloat(
+                            ConfigKeys.KEY_PROXIMITY_LOCK_METERS,
+                            ConfigKeys.DEFAULT_PROXIMITY_LOCK_METERS
+                    )
+            );
+            hasLegacyValues = true;
+        }
         if (hasLegacyValues) {
             editor.apply();
         }
@@ -115,11 +142,13 @@ public class MainActivity extends AppCompatActivity implements ModuleApplication
         refreshingSwitches = true;
         try {
             setSwitchValues(false);
+            setDistanceValues(false);
         } catch (RuntimeException e) {
             Log.w(TAG, "Read remote preferences failed", e);
             prefs = null;
             serviceStatus.setText(R.string.service_status_error);
             setSwitchValues(true);
+            setDistanceValues(true);
         } finally {
             refreshingSwitches = false;
         }
@@ -187,8 +216,129 @@ public class MainActivity extends AppCompatActivity implements ModuleApplication
                 rows.put(spec.key, row);
                 rowsContainer.addView(row);
             }
+            if (group == Group.PROXIMITY) {
+                buildDistanceRows(inflater, rowsContainer);
+            }
             container.addView(section);
         }
+    }
+
+    private void buildDistanceRows(LayoutInflater inflater, LinearLayout container) {
+        unlockDistanceRow = inflater.inflate(R.layout.row_slider, container, false);
+        lockDistanceRow = inflater.inflate(R.layout.row_slider, container, false);
+
+        unlockDistanceSlider = unlockDistanceRow.findViewById(R.id.distance_slider);
+        lockDistanceSlider = lockDistanceRow.findViewById(R.id.distance_slider);
+        unlockDistanceSlider.setId(View.generateViewId());
+        lockDistanceSlider.setId(View.generateViewId());
+        unlockDistanceValue = unlockDistanceRow.findViewById(R.id.slider_value);
+        lockDistanceValue = lockDistanceRow.findViewById(R.id.slider_value);
+
+        TextView unlockTitle = unlockDistanceRow.findViewById(R.id.slider_title);
+        TextView lockTitle = lockDistanceRow.findViewById(R.id.slider_title);
+        unlockTitle.setText(R.string.slider_unlock_distance);
+        unlockTitle.setLabelFor(unlockDistanceSlider.getId());
+        ((TextView) unlockDistanceRow.findViewById(R.id.slider_subtitle))
+                .setText(R.string.desc_unlock_distance);
+        lockTitle.setText(R.string.slider_lock_distance);
+        lockTitle.setLabelFor(lockDistanceSlider.getId());
+        ((TextView) lockDistanceRow.findViewById(R.id.slider_subtitle))
+                .setText(R.string.desc_lock_distance);
+
+        unlockDistanceSlider.setValueFrom(ProximityPolicy.MIN_METERS);
+        unlockDistanceSlider.setValueTo(
+                ProximityPolicy.MAX_METERS - ProximityPolicy.STEP_METERS
+        );
+        unlockDistanceSlider.setStepSize(ProximityPolicy.STEP_METERS);
+        lockDistanceSlider.setValueFrom(
+                ProximityPolicy.MIN_METERS + ProximityPolicy.STEP_METERS
+        );
+        lockDistanceSlider.setValueTo(ProximityPolicy.MAX_METERS);
+        lockDistanceSlider.setStepSize(ProximityPolicy.STEP_METERS);
+
+        unlockDistanceSlider.addOnChangeListener((slider, value, fromUser) -> {
+            updateDistanceLabels();
+            if (fromUser) {
+                persistDistances(true);
+            }
+        });
+        lockDistanceSlider.addOnChangeListener((slider, value, fromUser) -> {
+            updateDistanceLabels();
+            if (fromUser) {
+                persistDistances(false);
+            }
+        });
+
+        container.addView(unlockDistanceRow);
+        container.addView(lockDistanceRow);
+        setDistanceValues(true);
+    }
+
+    private void setDistanceValues(boolean useDefaults) {
+        if (unlockDistanceSlider == null || lockDistanceSlider == null) {
+            return;
+        }
+        float unlock = useDefaults || prefs == null
+                ? ConfigKeys.DEFAULT_PROXIMITY_UNLOCK_METERS
+                : prefs.getFloat(
+                        ConfigKeys.KEY_PROXIMITY_UNLOCK_METERS,
+                        ConfigKeys.DEFAULT_PROXIMITY_UNLOCK_METERS
+                );
+        float lock = useDefaults || prefs == null
+                ? ConfigKeys.DEFAULT_PROXIMITY_LOCK_METERS
+                : prefs.getFloat(
+                        ConfigKeys.KEY_PROXIMITY_LOCK_METERS,
+                        ConfigKeys.DEFAULT_PROXIMITY_LOCK_METERS
+                );
+        ProximityPolicy.Distances distances = ProximityPolicy.normalize(unlock, lock);
+        unlockDistanceSlider.setValue(distances.unlockMeters);
+        lockDistanceSlider.setValue(distances.lockMeters);
+        updateDistanceLabels();
+    }
+
+    private void persistDistances(boolean unlockChanged) {
+        if (refreshingSwitches || prefs == null) {
+            return;
+        }
+        float unlock = unlockDistanceSlider.getValue();
+        float lock = lockDistanceSlider.getValue();
+        if (unlockChanged && lock < unlock + ProximityPolicy.STEP_METERS) {
+            lock = Math.min(
+                    ProximityPolicy.MAX_METERS,
+                    unlock + ProximityPolicy.STEP_METERS
+            );
+        } else if (!unlockChanged && lock < unlock + ProximityPolicy.STEP_METERS) {
+            unlock = Math.max(
+                    ProximityPolicy.MIN_METERS,
+                    lock - ProximityPolicy.STEP_METERS
+            );
+        }
+        ProximityPolicy.Distances distances = ProximityPolicy.normalize(unlock, lock);
+        unlockDistanceSlider.setValue(distances.unlockMeters);
+        lockDistanceSlider.setValue(distances.lockMeters);
+        updateDistanceLabels();
+        try {
+            prefs.edit()
+                    .putFloat(ConfigKeys.KEY_PROXIMITY_UNLOCK_METERS, distances.unlockMeters)
+                    .putFloat(ConfigKeys.KEY_PROXIMITY_LOCK_METERS, distances.lockMeters)
+                    .apply();
+        } catch (RuntimeException error) {
+            handleRemotePreferencesError(error);
+        }
+    }
+
+    private void updateDistanceLabels() {
+        if (unlockDistanceValue == null || lockDistanceValue == null) {
+            return;
+        }
+        unlockDistanceValue.setText(getString(
+                R.string.distance_value,
+                unlockDistanceSlider.getValue()
+        ));
+        lockDistanceValue.setText(getString(
+                R.string.distance_value,
+                lockDistanceSlider.getValue()
+        ));
     }
 
     /**
@@ -210,6 +360,23 @@ public class MainActivity extends AppCompatActivity implements ModuleApplication
             }
             setRowEnabled(spec.key, enabled);
         }
+        boolean distanceEnabled = masterOn && isChecked(
+                ConfigKeys.KEY_OVERRIDE_PROXIMITY_DISTANCE,
+                ConfigKeys.DEFAULT_OVERRIDE_PROXIMITY_DISTANCE
+        );
+        setDistanceRowsEnabled(distanceEnabled);
+    }
+
+    private void setDistanceRowsEnabled(boolean enabled) {
+        if (unlockDistanceSlider == null || lockDistanceSlider == null) {
+            return;
+        }
+        unlockDistanceSlider.setEnabled(enabled);
+        lockDistanceSlider.setEnabled(enabled);
+        unlockDistanceRow.setEnabled(enabled);
+        lockDistanceRow.setEnabled(enabled);
+        unlockDistanceRow.setAlpha(enabled ? 1.0f : 0.4f);
+        lockDistanceRow.setAlpha(enabled ? 1.0f : 0.4f);
     }
 
     private boolean isChecked(String key, boolean def) {
@@ -267,6 +434,28 @@ public class MainActivity extends AppCompatActivity implements ModuleApplication
                 ConfigKeys.KEY_HOOK_CONFIG_BEAN));
         list.add(new ToggleSpec(ConfigKeys.KEY_HOOK_APP_UPDATE, R.string.switch_hook_app_update,
                 R.string.desc_hook_app_update, ConfigKeys.DEFAULT_HOOK_APP_UPDATE, Group.HOME, null));
+        list.add(new ToggleSpec(ConfigKeys.KEY_SIMPLIFY_HOME_NAV, R.string.switch_simplify_home_nav,
+                R.string.desc_simplify_home_nav, ConfigKeys.DEFAULT_SIMPLIFY_HOME_NAV, Group.HOME, null));
+        list.add(new ToggleSpec(ConfigKeys.KEY_ENABLE_VEHICLE_DIAGNOSTICS,
+                R.string.switch_vehicle_diagnostics, R.string.desc_vehicle_diagnostics,
+                ConfigKeys.DEFAULT_ENABLE_VEHICLE_DIAGNOSTICS, Group.HOME, null));
+
+        list.add(new ToggleSpec(ConfigKeys.KEY_BLOCK_USAGE_REPORT, R.string.switch_block_usage_report,
+                R.string.desc_block_usage_report, ConfigKeys.DEFAULT_BLOCK_USAGE_REPORT,
+                Group.PRIVACY, null));
+        list.add(new ToggleSpec(ConfigKeys.KEY_BLOCK_BUGLY, R.string.switch_block_bugly,
+                R.string.desc_block_bugly, ConfigKeys.DEFAULT_BLOCK_BUGLY, Group.PRIVACY, null));
+
+        list.add(new ToggleSpec(ConfigKeys.KEY_ENABLE_TRACK_EXPORT, R.string.switch_track_export,
+                R.string.desc_track_export, ConfigKeys.DEFAULT_ENABLE_TRACK_EXPORT, Group.DATA, null));
+        list.add(new ToggleSpec(ConfigKeys.KEY_TRIM_TRACK_ENDPOINTS,
+                R.string.switch_trim_track_endpoints, R.string.desc_trim_track_endpoints,
+                ConfigKeys.DEFAULT_TRIM_TRACK_ENDPOINTS, Group.DATA,
+                ConfigKeys.KEY_ENABLE_TRACK_EXPORT));
+
+        list.add(new ToggleSpec(ConfigKeys.KEY_OVERRIDE_PROXIMITY_DISTANCE,
+                R.string.switch_override_proximity, R.string.desc_override_proximity,
+                ConfigKeys.DEFAULT_OVERRIDE_PROXIMITY_DISTANCE, Group.PROXIMITY, null));
 
         list.add(new ToggleSpec(ConfigKeys.KEY_VERBOSE_LOG, R.string.switch_verbose_log,
                 R.string.desc_verbose_log, ConfigKeys.DEFAULT_VERBOSE_LOG, Group.DEBUG, null));
@@ -277,6 +466,9 @@ public class MainActivity extends AppCompatActivity implements ModuleApplication
         GENERAL(R.string.group_general),
         SPLASH(R.string.group_splash),
         HOME(R.string.group_home),
+        PRIVACY(R.string.group_privacy),
+        DATA(R.string.group_data),
+        PROXIMITY(R.string.group_proximity),
         DEBUG(R.string.group_debug);
 
         final int titleRes;

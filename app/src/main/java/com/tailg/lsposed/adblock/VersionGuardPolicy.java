@@ -1,7 +1,7 @@
 package com.tailg.lsposed.adblock;
 
 final class VersionGuardPolicy {
-    private static final String[] SUPPORTED_PREFIXES = {"3.5"};
+    private static final String SUPPORTED_VERSION = "3.5.9";
 
     private VersionGuardPolicy() {
     }
@@ -14,14 +14,6 @@ final class VersionGuardPolicy {
     }
 
     static boolean isSupported(String versionName) {
-        if (versionName == null) {
-            return false;
-        }
-        for (String prefix : SUPPORTED_PREFIXES) {
-            if (versionName.equals(prefix) || versionName.startsWith(prefix + ".")) {
-                return true;
-            }
-        }
-        return false;
+        return SUPPORTED_VERSION.equals(versionName);
     }
 }

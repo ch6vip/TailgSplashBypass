@@ -16,6 +16,12 @@ public class HookRequestPlanTest {
                 true,
                 true,
                 true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
                 true
         );
 
@@ -27,7 +33,11 @@ public class HookRequestPlanTest {
         assertEquals(6, plan.configBeanRequestCount());
         // getIsPop + getIsForce
         assertEquals(2, plan.appUpdateRequestCount());
-        assertEquals(10, plan.totalRequestCount());
+        assertEquals(1, plan.repositoryRequestCount());
+        assertEquals(2, plan.homeActivityRequestCount());
+        assertEquals(1, plan.trackExportRequestCount());
+        assertEquals(2, plan.proximityRequestCount());
+        assertEquals(16, plan.totalRequestCount());
     }
 
     @Test
@@ -39,6 +49,12 @@ public class HookRequestPlanTest {
                 true,
                 true,
                 true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
                 false
         );
 
@@ -60,6 +76,12 @@ public class HookRequestPlanTest {
                 false,
                 false,
                 true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
                 false
         );
 
@@ -79,7 +101,13 @@ public class HookRequestPlanTest {
                 false,
                 false,
                 false,
-                true
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
         );
 
         assertFalse(plan.hasSplashHooks());
@@ -92,6 +120,12 @@ public class HookRequestPlanTest {
     @Test
     public void allDisabled_hasZeroRequests() {
         HookRequestPlan plan = HookRequestPlan.fromConfig(
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
                 false,
                 false,
                 false,

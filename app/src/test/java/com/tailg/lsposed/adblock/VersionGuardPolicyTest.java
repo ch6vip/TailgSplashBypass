@@ -20,9 +20,15 @@ public class VersionGuardPolicyTest {
 
     @Test
     public void supportedVersion_isAlwaysAllowed() {
-        assertTrue(VersionGuardPolicy.shouldInstallHooks("3.5", true));
         assertTrue(VersionGuardPolicy.shouldInstallHooks("3.5.9", true));
         assertTrue(VersionGuardPolicy.shouldInstallHooks("3.5.9", false));
+    }
+
+    @Test
+    public void nearby35Versions_areNotAssumedCompatible() {
+        assertFalse(VersionGuardPolicy.shouldInstallHooks("3.5", true));
+        assertFalse(VersionGuardPolicy.shouldInstallHooks("3.5.8", true));
+        assertFalse(VersionGuardPolicy.shouldInstallHooks("3.5.10", true));
     }
 
     @Test
