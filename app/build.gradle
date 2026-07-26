@@ -42,7 +42,7 @@ if (hasAnyReleaseSigning && !hasReleaseSigning) {
 
 android {
     namespace "com.tailg.lsposed.adblock"
-    compileSdk 34
+    compileSdk 36
 
     defaultConfig {
         applicationId "com.tailg.lsposed.adblock"

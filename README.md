@@ -75,7 +75,7 @@
 
 - 当前使用 Modern Xposed API（`io.github.libxposed:api:101.0.1`）。
 - 设置页使用 `com.google.android.material:material:1.12.0`（Material 3）；模块 Hook 逻辑本身不依赖它。
-- `minSdk` 设为 26。
+- `compileSdk` 设为 36，`targetSdk` 设为 34，`minSdk` 设为 26。
 
 ## 签名发布（GitHub）
 
