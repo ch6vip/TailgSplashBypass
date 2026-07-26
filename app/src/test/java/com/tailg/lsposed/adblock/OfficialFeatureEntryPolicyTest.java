@@ -57,4 +57,11 @@ public class OfficialFeatureEntryPolicyTest {
                 true
         ));
     }
+
+    @Test
+    public void batteryInformationShortcut_onlyAddedForMainCar() {
+        assertTrue(OfficialFeatureEntryPolicy.shouldAddBatteryInfoShortcut(true, false));
+        assertFalse(OfficialFeatureEntryPolicy.shouldAddBatteryInfoShortcut(true, true));
+        assertFalse(OfficialFeatureEntryPolicy.shouldAddBatteryInfoShortcut(false, false));
+    }
 }

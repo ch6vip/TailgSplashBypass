@@ -849,6 +849,9 @@ final class OfficialSettingsPanel {
         add(result, ConfigKeys.KEY_SHOW_BATTERY_DYNAMICS_ENTRY, "电池动态页面入口",
                 "在主车设置中补充官方电池历史页",
                 ConfigKeys.DEFAULT_SHOW_BATTERY_DYNAMICS_ENTRY, Group.HIDDEN, null);
+        add(result, ConfigKeys.KEY_SHOW_BATTERY_INFO_SHORTCUT, "电池信息快捷入口",
+                "按当前车型自动打开官方电池信息页",
+                ConfigKeys.DEFAULT_SHOW_BATTERY_INFO_SHORTCUT, Group.HIDDEN, null);
         add(result, ConfigKeys.KEY_SHOW_CUSTOM_VEHICLE_SOUND, "自定义车辆音效",
                 "仅车辆上报支持时补充官方音效入口",
                 ConfigKeys.DEFAULT_SHOW_CUSTOM_VEHICLE_SOUND, Group.HIDDEN, null);

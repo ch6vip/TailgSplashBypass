@@ -214,6 +214,7 @@ public class TailgAdBlockModule extends XposedModule {
                 config.enableMonthlyRideData,
                 config.showBrakeForceData,
                 config.showBatteryDynamicsEntry,
+                config.showBatteryInfoShortcut,
                 config.showCustomVehicleSound,
                 config.overrideProximityDistance,
                 config.bleReconnect,
@@ -742,7 +743,9 @@ public class TailgAdBlockModule extends XposedModule {
         if (config.showBrakeForceData) {
             installBrakeForceDataHook(classLoader, config.verboseLog, report);
         }
-        if (config.showBatteryDynamicsEntry || config.showCustomVehicleSound) {
+        if (config.showBatteryDynamicsEntry
+                || config.showBatteryInfoShortcut
+                || config.showCustomVehicleSound) {
             installTBoxFeatureEntryHook(classLoader, config, report);
         }
     }
@@ -902,6 +905,7 @@ public class TailgAdBlockModule extends XposedModule {
                                 chain.getThisObject(),
                                 classLoader,
                                 config.showBatteryDynamicsEntry,
+                                config.showBatteryInfoShortcut,
                                 config.showCustomVehicleSound
                         );
                         return result;
@@ -1269,6 +1273,10 @@ public class TailgAdBlockModule extends XposedModule {
                             defaults.showBatteryDynamicsEntry
                     ),
                     prefs.getBoolean(
+                            ConfigKeys.KEY_SHOW_BATTERY_INFO_SHORTCUT,
+                            defaults.showBatteryInfoShortcut
+                    ),
+                    prefs.getBoolean(
                             ConfigKeys.KEY_SHOW_CUSTOM_VEHICLE_SOUND,
                             defaults.showCustomVehicleSound
                     ),
@@ -1356,6 +1364,7 @@ public class TailgAdBlockModule extends XposedModule {
         final boolean enableMonthlyRideData;
         final boolean showBrakeForceData;
         final boolean showBatteryDynamicsEntry;
+        final boolean showBatteryInfoShortcut;
         final boolean showCustomVehicleSound;
         final boolean enableVehicleDiagnostics;
         final boolean overrideProximityDistance;
@@ -1387,6 +1396,7 @@ public class TailgAdBlockModule extends XposedModule {
                 boolean enableMonthlyRideData,
                 boolean showBrakeForceData,
                 boolean showBatteryDynamicsEntry,
+                boolean showBatteryInfoShortcut,
                 boolean showCustomVehicleSound,
                 boolean enableVehicleDiagnostics,
                 boolean overrideProximityDistance,
@@ -1417,6 +1427,7 @@ public class TailgAdBlockModule extends XposedModule {
             this.enableMonthlyRideData = enableMonthlyRideData;
             this.showBrakeForceData = showBrakeForceData;
             this.showBatteryDynamicsEntry = showBatteryDynamicsEntry;
+            this.showBatteryInfoShortcut = showBatteryInfoShortcut;
             this.showCustomVehicleSound = showCustomVehicleSound;
             this.enableVehicleDiagnostics = enableVehicleDiagnostics;
             this.overrideProximityDistance = overrideProximityDistance;
@@ -1450,6 +1461,7 @@ public class TailgAdBlockModule extends XposedModule {
                     ConfigKeys.DEFAULT_ENABLE_MONTHLY_RIDE_DATA,
                     ConfigKeys.DEFAULT_SHOW_BRAKE_FORCE_DATA,
                     ConfigKeys.DEFAULT_SHOW_BATTERY_DYNAMICS_ENTRY,
+                    ConfigKeys.DEFAULT_SHOW_BATTERY_INFO_SHORTCUT,
                     ConfigKeys.DEFAULT_SHOW_CUSTOM_VEHICLE_SOUND,
                     ConfigKeys.DEFAULT_ENABLE_VEHICLE_DIAGNOSTICS,
                     ConfigKeys.DEFAULT_OVERRIDE_PROXIMITY_DISTANCE,

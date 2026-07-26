@@ -54,6 +54,7 @@ final class HookRequestPlan {
             boolean enableMonthlyRideData,
             boolean showBrakeForceData,
             boolean showBatteryDynamicsEntry,
+            boolean showBatteryInfoShortcut,
             boolean showCustomVehicleSound,
             boolean overrideProximityDistance,
             boolean bleReconnect,
@@ -94,7 +95,9 @@ final class HookRequestPlan {
         int trackExport = enableTrackExport ? 1 : 0;
         int hiddenFeatures = (enableMonthlyRideData ? 2 : 0)
                 + (showBrakeForceData ? 1 : 0)
-                + (showBatteryDynamicsEntry || showCustomVehicleSound ? 1 : 0);
+                + ((showBatteryDynamicsEntry
+                || showBatteryInfoShortcut
+                || showCustomVehicleSound) ? 1 : 0);
         int proximity = overrideProximityDistance ? 2 : 0;
         int officialSettings = showOfficialSettingsEntry ? 2 : 0;
 
