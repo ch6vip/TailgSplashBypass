@@ -305,9 +305,9 @@ final class TrackExportController {
         Intent send = new Intent(Intent.ACTION_SEND)
                 .setType(mimeType)
                 .putExtra(Intent.EXTRA_STREAM, uri)
-                .putExtra(Intent.EXTRA_TITLE, filename)
-                .setClipData(ClipData.newUri(activity.getContentResolver(), filename, uri))
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                .putExtra(Intent.EXTRA_TITLE, filename);
+        send.setClipData(ClipData.newUri(activity.getContentResolver(), filename, uri));
+        send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         activity.startActivity(Intent.createChooser(send, "导出轨迹"));
     }
 
