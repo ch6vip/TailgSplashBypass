@@ -22,12 +22,20 @@ final class HookInstallReport {
         failed++;
     }
 
-    boolean shouldWarnSummary() {
-        return failed > 0 && installed == 0;
+    void markFailed(int count) {
+        failed += count;
     }
 
-    boolean shouldResetInstalledFlag() {
-        return requested > 0 && installed == 0;
+    void markRemainingFailed() {
+        failed += Math.max(0, requested - accounted());
+    }
+
+    int accounted() {
+        return installed + skipped + failed;
+    }
+
+    boolean shouldWarnSummary() {
+        return failed > 0 || skipped > 0 || accounted() != requested;
     }
 
     String summaryMessage() {

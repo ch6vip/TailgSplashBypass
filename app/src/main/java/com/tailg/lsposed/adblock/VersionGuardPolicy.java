@@ -18,7 +18,7 @@ final class VersionGuardPolicy {
             return false;
         }
         for (String prefix : SUPPORTED_PREFIXES) {
-            if (versionName.startsWith(prefix)) {
+            if (versionName.equals(prefix) || versionName.startsWith(prefix + ".")) {
                 return true;
             }
         }

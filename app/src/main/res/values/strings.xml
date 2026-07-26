@@ -5,6 +5,9 @@
 
     <string name="header_title">Tailg AdBlock</string>
     <string name="header_subtitle">com.tailg.run.intelligence · 支持 3.5.x</string>
+    <string name="service_status_connected">已连接 %1$s</string>
+    <string name="service_status_disconnected">LSPosed 服务未连接，设置暂不可用</string>
+    <string name="service_status_error">无法访问 LSPosed 远程配置</string>
     <string name="footer_hint">改动即时保存 · 需在 LSPosed 中重启目标应用后生效</string>
 
     <string name="group_general">总控</string>

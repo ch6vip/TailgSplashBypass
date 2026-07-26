@@ -5,7 +5,7 @@
     android:layout_height="wrap_content"
     android:background="?attr/selectableItemBackground"
     android:clickable="true"
-    android:focusable="true"
+    android:focusable="false"
     android:gravity="center_vertical"
     android:minHeight="56dp"
     android:orientation="horizontal"
@@ -23,6 +23,7 @@
             android:id="@+id/row_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:labelFor="@id/row_switch"
             android:textAppearance="?attr/textAppearanceBodyLarge"
             android:textColor="?attr/colorOnSurface" />
 
@@ -38,7 +39,5 @@
     <com.google.android.material.materialswitch.MaterialSwitch
         android:id="@+id/row_switch"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:clickable="false"
-        android:focusable="false" />
+        android:layout_height="wrap_content" />
 </LinearLayout>

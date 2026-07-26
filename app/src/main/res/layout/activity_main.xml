@@ -51,6 +51,17 @@
                 android:textAppearance="?attr/textAppearanceBodyMedium"
                 android:textColor="?attr/colorOnSurfaceVariant" />
 
+            <TextView
+                android:id="@+id/service_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_marginTop="6dp"
+                android:accessibilityLiveRegion="polite"
+                android:text="@string/service_status_disconnected"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="?attr/colorPrimary" />
+
             <LinearLayout
                 android:id="@+id/sections_container"
                 android:layout_width="match_parent"

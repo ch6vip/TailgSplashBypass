@@ -13,7 +13,7 @@
   - `ConfigGetBean#getDurationTime()` -> `"0"`
   - `ConfigGetBean#getBanners()/getBannerOssIds()` -> `""`（首页 Banner 广告；`ControlViewModel` 中 `isNotEmptyString(getBanners())` 为假即不渲染）
   - `CheckAppVersionBean#getIsPop()` -> `"0"`、`getIsForce()` -> `"0"`（App 升级弹窗；`HomeActivity` 仅在 `"1".equals(getIsPop())` 时弹框）
-- 版本检测：运行时记录目标应用 `versionName/versionCode`。
+- 版本检测：在目标 `Application.attach(Context)` 阶段读取 `versionName/versionCode`，避免应用 Context 尚未创建时误判为未知版本。
 - 安全策略：
   - 方法签名/返回类型不匹配时自动跳过对应 Hook，不中断其他 Hook
   - 支持按版本前缀白名单校验（可通过配置切换严格模式）
@@ -23,7 +23,8 @@
 设置页采用 **Material 3（`Theme.Material3.DayNight`）**，观感参考 HookVip：
 
 - 开关按「总控 / 开屏广告 / 首页·弹窗 / 调试」分组为圆角卡片，每行标题 + 副标题说明。
-- **即时保存**：拨动开关立即写入 `tailg_adblock`，无需保存按钮（重启目标应用后生效）。
+- **即时保存**：拨动开关立即写入 LSPosed 托管的远程配置 `tailg_adblock`，无需保存按钮（重启目标应用后生效）。
+- **服务状态**：设置页会显示 LSPosed 服务连接状态；服务不可用时禁用开关，避免产生“保存成功但 Hook 未读取”的假象。
 - **自动明暗（DayNight）**；Android 12+ 由 `DynamicColors` 套用壁纸取色（Material You）。
 - **联动置灰**：关闭「启用模块」置灰其余项；关闭「拦截开屏广告配置」（`hook_config_bean`）置灰其从属的清空资源/倒计时归零/首页 Banner。
 - UI 由 `MainActivity` 中的开关表数据驱动，新增开关只需加一行 + 两条字符串。
@@ -45,7 +46,7 @@
 
 ## 构建
 
-1. 用 Android Studio 打开本目录 `lsposed-tailg-adblock`。
+1. 使用 JDK 17，并用 Android Studio 打开本仓库根目录。
 2. 同步 Gradle。
 3. 构建 `app` 模块生成 APK（`debug` 或 `release`）。
 
@@ -54,12 +55,14 @@
 ```bash
 ./gradlew :app:assembleDebug
 ./gradlew :app:assembleRelease
+./gradlew :app:testDebugUnitTest :app:lintDebug
 ```
 
 仓库已提供 GitHub Actions：
 
 - `.github/workflows/android-build.yml`：push/PR 自动编译 debug+release
 - `.github/workflows/android-release-signed.yml`：手动触发签名 release
+- `.github/workflows/android-release-tag.yml`：推送版本 tag 后自动创建 GitHub Release
 
 ## 启用
 
@@ -87,18 +90,18 @@
 
 仓库已提供 `.github/workflows/android-release-tag.yml`：
 
-- 触发条件：`push` 一个形如 `versionCode-versionName` 的 tag（例如 `100-v1.0.0`）
-- 行为：先校验 tag 与 `app/build.gradle` 的版本配置一致，再自动签名构建 release APK 并上传到 GitHub Releases 对应 tag
+- 触发条件：push 一个与 `gradle.properties` 中 `moduleVersionName` 完全一致的 `v*` tag
+- 行为：校验 tag、自动签名构建 release APK，并上传到对应 GitHub Release
 
 发版命令示例：
 
 ```bash
-git tag 100-v1.0.0
-git push origin 100-v1.0.0
+git tag v1.3.0
+git push origin v1.3.0
 ```
 
 版本号规则：
 
-- `app/build.gradle` 中显式配置了 `moduleVersionCode` 和 `moduleVersionName`。
-- tag 必须严格等于 `${moduleVersionCode}-${moduleVersionName}`；不一致会在构建时直接失败。
-- 当前示例配置为：`moduleVersionCode=100`、`moduleVersionName=v1.0.0`，因此 tag 必须是 `100-v1.0.0`。
+- `gradle.properties` 是版本号的唯一来源，当前为 `moduleVersionCode=10300`、`moduleVersionName=v1.3.0`。
+- tag 必须严格等于 `moduleVersionName`；不一致会在构建时直接失败。
+- 手动签名工作流同样使用这组版本号，因此不会生成无法覆盖已安装版本的降级 APK。

@@ -2,12 +2,14 @@ package com.tailg.lsposed.adblock;
 
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.annotation.Nullable;
 
 import com.google.android.material.appbar.CollapsingToolbarLayout;
 import com.google.android.material.color.DynamicColors;
@@ -18,6 +20,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import io.github.libxposed.service.XposedService;
+
 /**
  * 设置页（模块 Launcher 图标）。
  *
@@ -27,8 +31,12 @@ import java.util.Map;
  * <p>UI 由数据驱动：{@link #buildSpecs()} 定义所有开关及其分组/依赖，界面按此生成，
  * 后续新增开关只需在该表加一行 + 两条字符串。</p>
  */
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements ModuleApplication.ServiceStateListener {
+    private static final String TAG = "TailgAdBlockSettings";
+
     private SharedPreferences prefs;
+    private TextView serviceStatus;
+    private boolean refreshingSwitches;
     private final Map<String, MaterialSwitch> switches = new LinkedHashMap<>();
     private final Map<String, View> rows = new LinkedHashMap<>();
     private final List<ToggleSpec> specs = buildSpecs();
@@ -37,14 +45,104 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         DynamicColors.applyToActivityIfAvailable(this);
         super.onCreate(savedInstanceState);
-        prefs = getSharedPreferences(ConfigKeys.PREFS_NAME, MODE_PRIVATE);
         setContentView(R.layout.activity_main);
 
         CollapsingToolbarLayout collapsing = findViewById(R.id.collapsing_toolbar);
         collapsing.setTitle(getString(R.string.header_title));
+        serviceStatus = findViewById(R.id.service_status);
 
         buildSections();
         applyGating();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        ModuleApplication.addServiceStateListener(this, true);
+    }
+
+    @Override
+    protected void onStop() {
+        ModuleApplication.removeServiceStateListener(this);
+        super.onStop();
+    }
+
+    @Override
+    public void onServiceStateChanged(@Nullable XposedService service) {
+        runOnUiThread(() -> bindRemotePreferences(service));
+    }
+
+    private void bindRemotePreferences(XposedService service) {
+        if (service == null) {
+            prefs = null;
+            serviceStatus.setText(R.string.service_status_disconnected);
+            refreshSwitches();
+            return;
+        }
+
+        try {
+            SharedPreferences remotePrefs = service.getRemotePreferences(ConfigKeys.PREFS_NAME);
+            migrateLegacyPreferences(remotePrefs);
+            prefs = remotePrefs;
+            serviceStatus.setText(getString(R.string.service_status_connected, service.getFrameworkName()));
+        } catch (RuntimeException e) {
+            handleRemotePreferencesError(e);
+            return;
+        }
+        refreshSwitches();
+    }
+
+    private void migrateLegacyPreferences(SharedPreferences remotePrefs) {
+        if (!remotePrefs.getAll().isEmpty()) {
+            return;
+        }
+
+        SharedPreferences legacyPrefs = getSharedPreferences(ConfigKeys.PREFS_NAME, MODE_PRIVATE);
+        SharedPreferences.Editor editor = remotePrefs.edit();
+        boolean hasLegacyValues = false;
+        for (ToggleSpec spec : specs) {
+            if (legacyPrefs.contains(spec.key)) {
+                editor.putBoolean(spec.key, legacyPrefs.getBoolean(spec.key, spec.def));
+                hasLegacyValues = true;
+            }
+        }
+        if (hasLegacyValues) {
+            editor.apply();
+        }
+    }
+
+    private void refreshSwitches() {
+        refreshingSwitches = true;
+        try {
+            setSwitchValues(false);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Read remote preferences failed", e);
+            prefs = null;
+            serviceStatus.setText(R.string.service_status_error);
+            setSwitchValues(true);
+        } finally {
+            refreshingSwitches = false;
+        }
+        applyGating();
+    }
+
+    private void setSwitchValues(boolean useDefaults) {
+        for (ToggleSpec spec : specs) {
+            MaterialSwitch toggle = switches.get(spec.key);
+            if (toggle != null) {
+                boolean checked = useDefaults || prefs == null
+                        ? spec.def
+                        : prefs.getBoolean(spec.key, spec.def);
+                toggle.setChecked(checked);
+            }
+        }
+    }
+
+    private void handleRemotePreferencesError(RuntimeException error) {
+        Log.w(TAG, "Access remote preferences failed", error);
+        prefs = null;
+        serviceStatus.setText(R.string.service_status_error);
+        refreshSwitches();
     }
 
     private void buildSections() {
@@ -70,9 +168,17 @@ public class MainActivity extends AppCompatActivity {
 
                 title.setText(spec.titleRes);
                 subtitle.setText(spec.descRes);
-                toggle.setChecked(prefs.getBoolean(spec.key, spec.def));
+                toggle.setChecked(spec.def);
                 toggle.setOnCheckedChangeListener((button, checked) -> {
-                    prefs.edit().putBoolean(spec.key, checked).apply();
+                    if (refreshingSwitches || prefs == null) {
+                        return;
+                    }
+                    try {
+                        prefs.edit().putBoolean(spec.key, checked).apply();
+                    } catch (RuntimeException e) {
+                        handleRemotePreferencesError(e);
+                        return;
+                    }
                     applyGating();
                 });
                 row.setOnClickListener(v -> toggle.toggle());
@@ -90,11 +196,13 @@ public class MainActivity extends AppCompatActivity {
      * 因此父开关重新打开后子项恢复原状态。
      */
     private void applyGating() {
-        boolean masterOn = isChecked(ConfigKeys.KEY_ENABLE_MODULE, ConfigKeys.DEFAULT_ENABLE_MODULE);
+        boolean serviceReady = prefs != null;
+        boolean masterOn = serviceReady
+                && isChecked(ConfigKeys.KEY_ENABLE_MODULE, ConfigKeys.DEFAULT_ENABLE_MODULE);
         for (ToggleSpec spec : specs) {
             boolean enabled;
             if (ConfigKeys.KEY_ENABLE_MODULE.equals(spec.key)) {
-                enabled = true;
+                enabled = serviceReady;
             } else if (spec.dependsOn != null) {
                 enabled = masterOn && isChecked(spec.dependsOn, true);
             } else {
@@ -106,7 +214,10 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean isChecked(String key, boolean def) {
         MaterialSwitch toggle = switches.get(key);
-        return toggle != null ? toggle.isChecked() : prefs.getBoolean(key, def);
+        if (toggle != null) {
+            return toggle.isChecked();
+        }
+        return prefs == null ? def : prefs.getBoolean(key, def);
     }
 
     private void setRowEnabled(String key, boolean enabled) {

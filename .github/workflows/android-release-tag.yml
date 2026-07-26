@@ -54,6 +54,9 @@ jobs:
         run: |
           echo "$SIGNING_KEYSTORE_BASE64" | base64 --decode > signing.keystore
 
+      - name: Run Unit Tests and Lint
+        run: ./gradlew :app:testDebugUnitTest :app:lintDebug --stacktrace
+
       - name: Build Signed Release APK
         env:
           SIGNING_STORE_FILE: ${{ github.workspace }}/signing.keystore

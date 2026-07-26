@@ -2,4 +2,4 @@ minApiVersion=101
 targetApiVersion=101
 staticScope=true
 name=Tailg AdBlock
-description=Disable splash ad flow for com.tailg.run.intelligence
+description=Disable splash ads, home banners, and app update popups for com.tailg.run.intelligence

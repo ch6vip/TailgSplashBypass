@@ -1,5 +1,6 @@
 package com.tailg.lsposed.adblock;
 
+import android.app.Application;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
@@ -7,9 +8,14 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.util.Log;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
+import io.github.libxposed.api.XposedInterface.ExceptionMode;
+import io.github.libxposed.api.XposedInterface.HookHandle;
 import io.github.libxposed.api.XposedModule;
 
 public class TailgAdBlockModule extends XposedModule {
@@ -22,25 +28,53 @@ public class TailgAdBlockModule extends XposedModule {
     private static final String CHECK_APP_VERSION_BEAN =
             "com.tailg.run.intelligence.model.mine_setting.bean.CheckAppVersionBean";
 
-    private final AtomicBoolean hooksInstalled = new AtomicBoolean(false);
+    private final AtomicBoolean initializationScheduled = new AtomicBoolean(false);
 
     @Override
     public void onPackageReady(PackageReadyParam param) {
         if (!TARGET_PACKAGE.equals(param.getPackageName())) {
             return;
         }
-        if (!hooksInstalled.compareAndSet(false, true)) {
+        if (!initializationScheduled.compareAndSet(false, true)) {
             return;
         }
 
         ModuleConfig config = readConfig();
         if (!config.enableModule) {
             log(Log.INFO, TAG, "Module disabled by config.");
-            hooksInstalled.set(false);
             return;
         }
 
-        VersionInfo versionInfo = detectVersionInfo();
+        scheduleHookInitialization(param, config);
+    }
+
+    private void scheduleHookInitialization(PackageReadyParam param, ModuleConfig config) {
+        try {
+            Method attachMethod = Application.class.getDeclaredMethod("attach", Context.class);
+            AtomicReference<HookHandle> attachHook = new AtomicReference<>();
+            HookHandle handle = hook(attachMethod)
+                    .setPriority(PRIORITY_HIGHEST)
+                    .setExceptionMode(ExceptionMode.PROTECTIVE)
+                    .intercept(chain -> {
+                        Object contextArg = chain.getArg(0);
+                        if (contextArg instanceof Context context
+                                && TARGET_PACKAGE.equals(context.getPackageName())) {
+                            HookHandle currentHandle = attachHook.get();
+                            if (currentHandle != null) {
+                                currentHandle.unhook();
+                            }
+                            initializeHooks(param.getClassLoader(), context, config);
+                        }
+                        return chain.proceed();
+                    });
+            attachHook.set(handle);
+        } catch (Throwable t) {
+            log(Log.ERROR, TAG, "Schedule hook initialization failed", t);
+        }
+    }
+
+    private void initializeHooks(ClassLoader classLoader, Context context, ModuleConfig config) {
+        VersionInfo versionInfo = detectVersionInfo(context);
         boolean versionSupported = VersionGuardPolicy.isSupported(versionInfo.versionName);
         boolean shouldInstallHooks = VersionGuardPolicy.shouldInstallHooks(
                 versionInfo.versionName,
@@ -53,7 +87,6 @@ public class TailgAdBlockModule extends XposedModule {
             log(Log.WARN, TAG, "Unsupported target version: " + versionInfo.versionName);
             if (!shouldInstallHooks) {
                 log(Log.WARN, TAG, "strict_version_guard enabled, skip installing hooks.");
-                hooksInstalled.set(false);
                 return;
             }
         }
@@ -70,29 +103,51 @@ public class TailgAdBlockModule extends XposedModule {
         HookInstallReport report = new HookInstallReport();
         report.markRequested(requestPlan.totalRequestCount());
         try {
-            ClassLoader classLoader = param.getClassLoader();
             if (requestPlan.hasSplashHooks()) {
-                installSplashHooks(classLoader, config, report);
+                installSplashHooks(
+                        classLoader,
+                        config,
+                        requestPlan.splashRequestCount(),
+                        report
+                );
             }
             if (requestPlan.hasConfigBeanHooks()) {
-                installConfigBeanHooks(classLoader, config, report);
+                installConfigBeanHooks(
+                        classLoader,
+                        config,
+                        requestPlan.configBeanRequestCount(),
+                        report
+                );
             }
             if (requestPlan.hasAppUpdateHooks()) {
-                installAppUpdateHooks(classLoader, config, report);
-            }
-            logInstallSummary(report);
-
-            if (report.shouldResetInstalledFlag()) {
-                hooksInstalled.set(false);
+                installAppUpdateHooks(
+                        classLoader,
+                        config,
+                        requestPlan.appUpdateRequestCount(),
+                        report
+                );
             }
         } catch (Throwable t) {
-            hooksInstalled.set(false);
+            report.markRemainingFailed();
             log(Log.ERROR, TAG, "Install hooks failed", t);
+        } finally {
+            logInstallSummary(report);
         }
     }
 
-    private void installSplashHooks(ClassLoader classLoader, ModuleConfig config, HookInstallReport report) {
-        Class<?> splashClazz = tryLoadClass(classLoader, SPLASH_ACTIVITY, "SplashActivity", report);
+    private void installSplashHooks(
+            ClassLoader classLoader,
+            ModuleConfig config,
+            int requestCount,
+            HookInstallReport report
+    ) {
+        Class<?> splashClazz = tryLoadClass(
+                classLoader,
+                SPLASH_ACTIVITY,
+                "SplashActivity",
+                requestCount,
+                report
+        );
         if (splashClazz == null) {
             return;
         }
@@ -105,8 +160,19 @@ public class TailgAdBlockModule extends XposedModule {
         }
     }
 
-    private void installConfigBeanHooks(ClassLoader classLoader, ModuleConfig config, HookInstallReport report) {
-        Class<?> beanClazz = tryLoadClass(classLoader, CONFIG_GET_BEAN, "ConfigGetBean", report);
+    private void installConfigBeanHooks(
+            ClassLoader classLoader,
+            ModuleConfig config,
+            int requestCount,
+            HookInstallReport report
+    ) {
+        Class<?> beanClazz = tryLoadClass(
+                classLoader,
+                CONFIG_GET_BEAN,
+                "ConfigGetBean",
+                requestCount,
+                report
+        );
         if (beanClazz == null) {
             return;
         }
@@ -126,8 +192,19 @@ public class TailgAdBlockModule extends XposedModule {
         }
     }
 
-    private void installAppUpdateHooks(ClassLoader classLoader, ModuleConfig config, HookInstallReport report) {
-        Class<?> beanClazz = tryLoadClass(classLoader, CHECK_APP_VERSION_BEAN, "CheckAppVersionBean", report);
+    private void installAppUpdateHooks(
+            ClassLoader classLoader,
+            ModuleConfig config,
+            int requestCount,
+            HookInstallReport report
+    ) {
+        Class<?> beanClazz = tryLoadClass(
+                classLoader,
+                CHECK_APP_VERSION_BEAN,
+                "CheckAppVersionBean",
+                requestCount,
+                report
+        );
         if (beanClazz == null) {
             return;
         }
@@ -138,15 +215,21 @@ public class TailgAdBlockModule extends XposedModule {
         hookStringMethod(beanClazz, "getIsForce", "0", config.verboseLog, report);
     }
 
-    private Class<?> tryLoadClass(ClassLoader classLoader, String className, String alias, HookInstallReport report) {
+    private Class<?> tryLoadClass(
+            ClassLoader classLoader,
+            String className,
+            String alias,
+            int requestCount,
+            HookInstallReport report
+    ) {
         try {
             return Class.forName(className, false, classLoader);
         } catch (ClassNotFoundException e) {
-            report.markFailed();
+            report.markFailed(requestCount);
             log(Log.WARN, TAG, "Class missing: " + alias + " (" + className + ")");
             return null;
         } catch (Throwable t) {
-            report.markFailed();
+            report.markFailed(requestCount);
             log(Log.ERROR, TAG, "Load class failed: " + alias + " (" + className + ")", t);
             return null;
         }
@@ -165,7 +248,10 @@ public class TailgAdBlockModule extends XposedModule {
             report.markSkipped();
             return;
         }
-        if (sourceMethod.getReturnType() != Void.TYPE || targetMethod.getReturnType() != Void.TYPE) {
+        if (sourceMethod.getReturnType() != Void.TYPE
+                || targetMethod.getReturnType() != Void.TYPE
+                || Modifier.isStatic(sourceMethod.getModifiers())
+                != Modifier.isStatic(targetMethod.getModifiers())) {
             report.markSkipped();
             log(Log.WARN, TAG, "Incompatible method signature: " + sourceMethodName + " / " + targetMethodName);
             return;
@@ -173,14 +259,26 @@ public class TailgAdBlockModule extends XposedModule {
 
         try {
             targetMethod.setAccessible(true);
-            hook(sourceMethod).setPriority(PRIORITY_HIGHEST).intercept(chain -> {
-                try {
-                    targetMethod.invoke(chain.getThisObject());
-                } catch (Throwable invokeError) {
-                    log(Log.ERROR, TAG, "Redirect invoke failed: " + sourceMethodName + " -> " + targetMethodName, invokeError);
-                }
-                return null;
-            });
+            hook(sourceMethod)
+                    .setPriority(PRIORITY_HIGHEST)
+                    .setExceptionMode(ExceptionMode.PROTECTIVE)
+                    .intercept(chain -> {
+                        try {
+                            targetMethod.invoke(chain.getThisObject());
+                        } catch (InvocationTargetException invocationError) {
+                            Throwable invokeError = invocationError.getCause() == null
+                                    ? invocationError
+                                    : invocationError.getCause();
+                            log(Log.ERROR, TAG, "Redirect invoke failed: " + sourceMethodName
+                                    + " -> " + targetMethodName, invokeError);
+                            throw invokeError;
+                        } catch (Throwable invokeError) {
+                            log(Log.ERROR, TAG, "Redirect invoke failed: " + sourceMethodName
+                                    + " -> " + targetMethodName, invokeError);
+                            throw invokeError;
+                        }
+                        return null;
+                    });
             report.markInstalled();
             if (verboseLog) {
                 log(Log.INFO, TAG, "Hooked " + sourceMethodName + " -> " + targetMethodName);
@@ -210,7 +308,10 @@ public class TailgAdBlockModule extends XposedModule {
         }
 
         try {
-            hook(method).setPriority(PRIORITY_HIGHEST).intercept(chain -> replacementValue);
+            hook(method)
+                    .setPriority(PRIORITY_HIGHEST)
+                    .setExceptionMode(ExceptionMode.PROTECTIVE)
+                    .intercept(chain -> replacementValue);
             report.markInstalled();
             if (verboseLog) {
                 log(Log.INFO, TAG, "Hooked " + targetClazz.getSimpleName() + "#" + methodName + " => \"" + replacementValue + "\"");
@@ -255,39 +356,40 @@ public class TailgAdBlockModule extends XposedModule {
             return defaults;
         }
 
-        return new ModuleConfig(
-                prefs.getBoolean(ConfigKeys.KEY_ENABLE_MODULE, defaults.enableModule),
-                prefs.getBoolean(ConfigKeys.KEY_STRICT_VERSION_GUARD, defaults.strictVersionGuard),
-                prefs.getBoolean(ConfigKeys.KEY_HOOK_SETUP_VIEW, defaults.hookSetupView),
-                prefs.getBoolean(ConfigKeys.KEY_HOOK_COUNT_DOWN, defaults.hookCountDown),
-                prefs.getBoolean(ConfigKeys.KEY_HOOK_CONFIG_BEAN, defaults.hookConfigBean),
-                prefs.getBoolean(ConfigKeys.KEY_FORCE_EMPTY_RES, defaults.forceEmptyRes),
-                prefs.getBoolean(ConfigKeys.KEY_FORCE_DURATION_ZERO, defaults.forceDurationZero),
-                prefs.getBoolean(ConfigKeys.KEY_FORCE_EMPTY_BANNER, defaults.forceEmptyBanner),
-                prefs.getBoolean(ConfigKeys.KEY_HOOK_APP_UPDATE, defaults.hookAppUpdate),
-                prefs.getBoolean(ConfigKeys.KEY_VERBOSE_LOG, defaults.verboseLog)
-        );
+        try {
+            return new ModuleConfig(
+                    prefs.getBoolean(ConfigKeys.KEY_ENABLE_MODULE, defaults.enableModule),
+                    prefs.getBoolean(ConfigKeys.KEY_STRICT_VERSION_GUARD, defaults.strictVersionGuard),
+                    prefs.getBoolean(ConfigKeys.KEY_HOOK_SETUP_VIEW, defaults.hookSetupView),
+                    prefs.getBoolean(ConfigKeys.KEY_HOOK_COUNT_DOWN, defaults.hookCountDown),
+                    prefs.getBoolean(ConfigKeys.KEY_HOOK_CONFIG_BEAN, defaults.hookConfigBean),
+                    prefs.getBoolean(ConfigKeys.KEY_FORCE_EMPTY_RES, defaults.forceEmptyRes),
+                    prefs.getBoolean(ConfigKeys.KEY_FORCE_DURATION_ZERO, defaults.forceDurationZero),
+                    prefs.getBoolean(ConfigKeys.KEY_FORCE_EMPTY_BANNER, defaults.forceEmptyBanner),
+                    prefs.getBoolean(ConfigKeys.KEY_HOOK_APP_UPDATE, defaults.hookAppUpdate),
+                    prefs.getBoolean(ConfigKeys.KEY_VERBOSE_LOG, defaults.verboseLog)
+            );
+        } catch (Throwable t) {
+            log(Log.WARN, TAG, "Read remote preference values failed, fallback to defaults", t);
+            return defaults;
+        }
     }
 
-    private VersionInfo detectVersionInfo() {
+    private VersionInfo detectVersionInfo(Context context) {
         try {
-            Class<?> activityThread = Class.forName("android.app.ActivityThread");
-            Object app = activityThread.getMethod("currentApplication").invoke(null);
-            if (app instanceof Context context) {
-                PackageManager packageManager = context.getPackageManager();
-                PackageInfo packageInfo;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    packageInfo = packageManager.getPackageInfo(
-                            TARGET_PACKAGE,
-                            PackageManager.PackageInfoFlags.of(0L)
-                    );
-                } else {
-                    packageInfo = packageManager.getPackageInfo(TARGET_PACKAGE, 0);
-                }
-                long versionCode = resolveVersionCode(packageInfo);
-                String versionName = packageInfo.versionName == null ? "unknown" : packageInfo.versionName;
-                return new VersionInfo(versionName, versionCode);
+            PackageManager packageManager = context.getPackageManager();
+            PackageInfo packageInfo;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageInfo = packageManager.getPackageInfo(
+                        TARGET_PACKAGE,
+                        PackageManager.PackageInfoFlags.of(0L)
+                );
+            } else {
+                packageInfo = packageManager.getPackageInfo(TARGET_PACKAGE, 0);
             }
+            long versionCode = resolveVersionCode(packageInfo);
+            String versionName = packageInfo.versionName == null ? "unknown" : packageInfo.versionName;
+            return new VersionInfo(versionName, versionCode);
         } catch (Throwable t) {
             log(Log.WARN, TAG, "Detect version failed", t);
         }

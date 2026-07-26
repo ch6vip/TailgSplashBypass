@@ -23,16 +23,34 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
+      - name: Validate Signing Secrets
+        shell: bash
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: |
+          missing=0
+          for key in SIGNING_KEYSTORE_BASE64 SIGNING_STORE_PASSWORD SIGNING_KEY_ALIAS SIGNING_KEY_PASSWORD; do
+            if [ -z "${!key}" ]; then
+              echo "Missing required secret: $key"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
       - name: Decode Keystore
         shell: bash
         env:
           SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
         run: |
-          if [ -z "$SIGNING_KEYSTORE_BASE64" ]; then
-            echo "Missing required secret: SIGNING_KEYSTORE_BASE64"
-            exit 1
-          fi
           echo "$SIGNING_KEYSTORE_BASE64" | base64 --decode > signing.keystore
+
+      - name: Run Unit Tests and Lint
+        run: ./gradlew :app:testDebugUnitTest :app:lintDebug --stacktrace
 
       - name: Build Signed Release APK
         env:

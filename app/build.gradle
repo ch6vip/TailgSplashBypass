@@ -2,9 +2,19 @@ plugins {
     id "com.android.application"
 }
 
-def defaultVersionName = "v1.0.0"
-def defaultVersionCode = 1
 def maxVersionCode = 2_100_000_000
+def moduleVersionName = providers.gradleProperty("moduleVersionName").get()
+def moduleVersionCode
+
+try {
+    moduleVersionCode = Integer.parseInt(providers.gradleProperty("moduleVersionCode").get())
+} catch (NumberFormatException e) {
+    throw new GradleException("moduleVersionCode must be an integer", e)
+}
+
+if (moduleVersionCode < 1 || moduleVersionCode > maxVersionCode) {
+    throw new GradleException("Invalid moduleVersionCode=${moduleVersionCode}. Valid range: 1..${maxVersionCode}")
+}
 
 def githubRefType = System.getenv("GITHUB_REF_TYPE")
 def githubRefName = System.getenv("GITHUB_REF_NAME")
@@ -12,37 +22,23 @@ def releaseTagName = (githubRefType == "tag" && githubRefName != null && !github
         ? githubRefName.trim()
         : null
 
-def resolvedVersionName = releaseTagName ?: defaultVersionName
-def resolvedVersionCode = defaultVersionCode
-
-if (releaseTagName != null) {
-    def numberParts = []
-    def matcher = (releaseTagName =~ /\d+/)
-    while (matcher.find()) {
-        numberParts << matcher.group().toInteger()
-    }
-
-    if (!numberParts.isEmpty()) {
-        int major = numberParts[0]
-        int minor = numberParts.size() > 1 ? numberParts[1] : 0
-        int patch = numberParts.size() > 2 ? numberParts[2] : 0
-        resolvedVersionCode = Math.max(1, Math.min(maxVersionCode, major * 10_000 + minor * 100 + patch))
-    }
-}
-
-if (resolvedVersionCode < 1 || resolvedVersionCode > maxVersionCode) {
-    throw new GradleException("Invalid resolvedVersionCode=${resolvedVersionCode}. Valid range: 1..${maxVersionCode}")
+if (releaseTagName != null && releaseTagName != moduleVersionName) {
+    throw new GradleException(
+            "Release tag '${releaseTagName}' must match moduleVersionName '${moduleVersionName}'"
+    )
 }
 
 def signingStoreFile = System.getenv("SIGNING_STORE_FILE")
 def signingStorePassword = System.getenv("SIGNING_STORE_PASSWORD")
 def signingKeyAlias = System.getenv("SIGNING_KEY_ALIAS")
 def signingKeyPassword = System.getenv("SIGNING_KEY_PASSWORD")
-def hasReleaseSigning =
-        signingStoreFile != null &&
-        signingStorePassword != null &&
-        signingKeyAlias != null &&
-        signingKeyPassword != null
+def signingValues = [signingStoreFile, signingStorePassword, signingKeyAlias, signingKeyPassword]
+def hasAnyReleaseSigning = signingValues.any { it != null && !it.trim().isEmpty() }
+def hasReleaseSigning = signingValues.every { it != null && !it.trim().isEmpty() }
+
+if (hasAnyReleaseSigning && !hasReleaseSigning) {
+    throw new GradleException("Release signing requires all SIGNING_* environment variables")
+}
 
 android {
     namespace "com.tailg.lsposed.adblock"
@@ -52,8 +48,8 @@ android {
         applicationId "com.tailg.lsposed.adblock"
         minSdk 26
         targetSdk 34
-        versionCode resolvedVersionCode
-        versionName resolvedVersionName
+        versionCode moduleVersionCode
+        versionName moduleVersionName
     }
 
     signingConfigs {
@@ -97,6 +93,7 @@ android {
 
 dependencies {
     compileOnly "io.github.libxposed:api:101.0.1"
+    implementation "io.github.libxposed:service:101.0.0"
     implementation "com.google.android.material:material:1.12.0"
     testImplementation "junit:junit:4.13.2"
 }
