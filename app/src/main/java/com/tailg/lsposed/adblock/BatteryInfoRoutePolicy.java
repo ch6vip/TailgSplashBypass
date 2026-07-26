@@ -6,6 +6,7 @@ final class BatteryInfoRoutePolicy {
         C39,
         TLV,
         BMS,
+        DYNAMICS,
         UNAVAILABLE
     }
 
@@ -59,7 +60,47 @@ final class BatteryInfoRoutePolicy {
                 : carModelType;
     }
 
+    static boolean canOpenManually(
+            Route route,
+            Integer currentModelType,
+            Integer carModelType,
+            Integer isGps,
+            String bmsTlvType
+    ) {
+        int modelType = effectiveModelType(currentModelType, carModelType);
+        switch (route) {
+            case NORMAL:
+                return modelType == 1
+                        || modelType == 2
+                        || isGps != null && isGps == 1;
+            case C39:
+                return modelType == 10 || modelType == 14;
+            case TLV:
+                return !hasDedicatedBatteryPage(modelType)
+                        && isGps != null
+                        && isGps == 1
+                        && ("160".equals(bmsTlvType) || "208".equals(bmsTlvType));
+            case BMS:
+                return !hasDedicatedBatteryPage(modelType)
+                        && isGps != null
+                        && isGps == 1
+                        && "176".equals(bmsTlvType);
+            case DYNAMICS:
+                return true;
+            case UNAVAILABLE:
+            default:
+                return false;
+        }
+    }
+
     private static boolean validModelType(Integer modelType) {
         return modelType != null && modelType >= 0;
+    }
+
+    private static boolean hasDedicatedBatteryPage(int modelType) {
+        return modelType == 1
+                || modelType == 2
+                || modelType == 10
+                || modelType == 14;
     }
 }

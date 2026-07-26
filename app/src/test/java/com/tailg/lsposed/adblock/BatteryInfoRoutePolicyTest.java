@@ -49,6 +49,31 @@ public class BatteryInfoRoutePolicyTest {
         assertEquals(10, BatteryInfoRoutePolicy.intentModelType(null, 10));
     }
 
+    @Test
+    public void manualNormalPage_acceptsLegacyAndGpsVehicles() {
+        assertManual(true, BatteryInfoRoutePolicy.Route.NORMAL, 1, 1, 0, null);
+        assertManual(true, BatteryInfoRoutePolicy.Route.NORMAL, 8, 8, 1, "176");
+        assertManual(false, BatteryInfoRoutePolicy.Route.NORMAL, 8, 8, 0, null);
+    }
+
+    @Test
+    public void manualSpecialPages_requireMatchingVehicleData() {
+        assertManual(true, BatteryInfoRoutePolicy.Route.C39, 10, 10, 0, null);
+        assertManual(false, BatteryInfoRoutePolicy.Route.C39, 8, 8, 1, "160");
+        assertManual(true, BatteryInfoRoutePolicy.Route.TLV, 8, 8, 1, "160");
+        assertManual(true, BatteryInfoRoutePolicy.Route.TLV, 8, 8, 1, "208");
+        assertManual(false, BatteryInfoRoutePolicy.Route.TLV, 8, 8, 1, "176");
+        assertManual(false, BatteryInfoRoutePolicy.Route.TLV, 10, 10, 1, "160");
+        assertManual(true, BatteryInfoRoutePolicy.Route.BMS, 8, 8, 1, "176");
+        assertManual(false, BatteryInfoRoutePolicy.Route.BMS, 8, 8, 1, "208");
+        assertManual(false, BatteryInfoRoutePolicy.Route.BMS, 14, 14, 1, "176");
+    }
+
+    @Test
+    public void batteryDynamics_usesRuntimeUuidCheck() {
+        assertManual(true, BatteryInfoRoutePolicy.Route.DYNAMICS, null, null, null, null);
+    }
+
     private static void assertRoute(
             BatteryInfoRoutePolicy.Route expected,
             Integer currentModelType,
@@ -65,6 +90,26 @@ public class BatteryInfoRoutePolicyTest {
                         isGps,
                         bmsTlvType,
                         shareCarFlag
+                )
+        );
+    }
+
+    private static void assertManual(
+            boolean expected,
+            BatteryInfoRoutePolicy.Route route,
+            Integer currentModelType,
+            Integer carModelType,
+            Integer isGps,
+            String bmsTlvType
+    ) {
+        assertEquals(
+                expected,
+                BatteryInfoRoutePolicy.canOpenManually(
+                        route,
+                        currentModelType,
+                        carModelType,
+                        isGps,
+                        bmsTlvType
                 )
         );
     }

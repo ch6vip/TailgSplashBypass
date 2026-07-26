@@ -26,16 +26,28 @@ final class BatteryInfoShortcutController {
             "com.tailg.run.intelligence.model.battery.BatteryInfoTlvActivity";
     private static final String BMS_ACTIVITY =
             "com.tailg.run.intelligence.model.battery.BmsBatteryTlvActivity";
+    private static final String TBOX_COMPONENT =
+            "com.thinkerride.tbox.component.TBoxComponent";
+    private static final String DYNAMICS_ACTIVITY =
+            "com.thinkerride.tbox.centercontrol.battery.BatteryChartActivity";
 
     private BatteryInfoShortcutController() {
     }
 
-    static void open(Activity activity, ClassLoader classLoader) {
+    static boolean open(Activity activity, ClassLoader classLoader) {
+        return open(activity, classLoader, null);
+    }
+
+    static boolean open(
+            Activity activity,
+            ClassLoader classLoader,
+            BatteryInfoRoutePolicy.Route requestedRoute
+    ) {
         try {
             Object car = invokeStaticNoArg(classLoader, PREFS_UTIL, "getCarControlInfo");
             if (car == null) {
                 showUnavailable(activity);
-                return;
+                return false;
             }
 
             Integer currentModelType = asInteger(
@@ -45,18 +57,30 @@ final class BatteryInfoShortcutController {
             Integer isGps = asInteger(ReflectionAccess.invokeNoArg(car, "getIsGps"));
             String bmsTlvType = asString(ReflectionAccess.invokeNoArg(car, "getBmsTlvType"));
             String shareCarFlag = asString(ReflectionAccess.invokeNoArg(car, "getShareCarFlag"));
-            BatteryInfoRoutePolicy.Route route = BatteryInfoRoutePolicy.resolve(
+            BatteryInfoRoutePolicy.Route route = requestedRoute;
+            if (route == null) {
+                route = BatteryInfoRoutePolicy.resolve(
+                        currentModelType,
+                        carModelType,
+                        isGps,
+                        bmsTlvType,
+                        shareCarFlag
+                );
+            } else if (!BatteryInfoRoutePolicy.canOpenManually(
+                    route,
                     currentModelType,
                     carModelType,
                     isGps,
-                    bmsTlvType,
-                    shareCarFlag
-            );
+                    bmsTlvType
+            )) {
+                showIncompatible(activity);
+                return false;
+            }
 
             switch (route) {
                 case NORMAL:
                     launchWithOfficialUtility(activity, classLoader, NORMAL_ACTIVITY, null);
-                    return;
+                    return true;
                 case C39:
                     Object intentMsg = newIntentMsg(classLoader);
                     ReflectionAccess.setField(
@@ -68,7 +92,7 @@ final class BatteryInfoShortcutController {
                             )
                     );
                     launchWithOfficialUtility(activity, classLoader, C39_ACTIVITY, intentMsg);
-                    return;
+                    return true;
                 case TLV:
                 case BMS:
                     launchTlvActivity(
@@ -85,14 +109,18 @@ final class BatteryInfoShortcutController {
                                     currentModelType
                             )
                     );
-                    return;
+                    return true;
+                case DYNAMICS:
+                    return launchBatteryDynamics(activity, classLoader);
                 case UNAVAILABLE:
                 default:
                     showUnavailable(activity);
+                    return false;
             }
         } catch (Throwable error) {
             Log.w(TAG, "Open battery information failed", error);
             Toast.makeText(activity, "电池信息页面打开失败", Toast.LENGTH_SHORT).show();
+            return false;
         }
     }
 
@@ -149,6 +177,33 @@ final class BatteryInfoShortcutController {
         activity.startActivity(intent);
     }
 
+    private static boolean launchBatteryDynamics(
+            Activity activity,
+            ClassLoader classLoader
+    ) throws ReflectiveOperationException {
+        Object centerControlAction = invokeStaticNoArg(
+                classLoader,
+                TBOX_COMPONENT,
+                "getCenterControlAction"
+        );
+        String uuid = asString(
+                ReflectionAccess.invokeNoArg(centerControlAction, "getCurrentUUID")
+        );
+        if (uuid == null || uuid.trim().isEmpty()) {
+            Toast.makeText(
+                    activity,
+                    "当前车辆缺少电池动态所需的中控标识",
+                    Toast.LENGTH_SHORT
+            ).show();
+            return false;
+        }
+
+        Class<?> activityClass = Class.forName(DYNAMICS_ACTIVITY, false, classLoader);
+        Method start = activityClass.getDeclaredMethod("start", Context.class);
+        start.invoke(null, activity);
+        return true;
+    }
+
     private static Integer asInteger(Object value) {
         return value instanceof Number ? ((Number) value).intValue() : null;
     }
@@ -159,5 +214,9 @@ final class BatteryInfoShortcutController {
 
     private static void showUnavailable(Activity activity) {
         Toast.makeText(activity, "当前车辆暂无可用的电池信息页", Toast.LENGTH_SHORT).show();
+    }
+
+    private static void showIncompatible(Activity activity) {
+        Toast.makeText(activity, "当前车辆不支持所选电池信息页", Toast.LENGTH_SHORT).show();
     }
 }

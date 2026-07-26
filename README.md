@@ -38,7 +38,7 @@
 
 - 可放开首页月度骑行数据入口；仍保留官方设备检查、Presenter 就绪检查及本地/云端页面分流。
 - 可让 AI 骑行记录详情把制动力能力参数传给轨迹回放页；只显示官方已返回的数据，不生成缺失的制动力数据。
-- 可直接在官方 App 内的 Material 3 配置面板点击“电池信息”，按当前车型自动打开普通、C39、TLV 或 BMS 电池页；无法安全判断的非 GPS 车型不会误跳转。
+- 可直接在官方 App 内的 Material 3 配置面板点击“电池信息”，再选择自动匹配、普通、C39、TLV、BMS 或电池动态页；手动选择仍校验车型、电池类型及中控 UUID，不兼容时不会强行打开。
 - 可在主车 TBox 设置底部的“Tailg 工具箱”分组补充“电池动态”入口；页面只读取官方 UUID 对应的服务端历史，后端没有记录时可能为空。
 - 可在车辆已绑定、且能力配置明确上报 `tbox_voice_cust == 1` 时补充“自定义音效”入口；录音权限、音效库、上传和保存均复用官方实现。
 - 这些功能互相独立；四个功能开关默认关闭，“电池信息”为直接操作项。模块不会全局改写 `DeviceFunction`，也不会伪造 ECU/BLE 能力或发送自定义控车指令。
@@ -86,7 +86,7 @@
 - `.github/workflows/android-release-signed.yml`：手动触发签名 release。
 - `.github/workflows/android-release-tag.yml`：推送与 `moduleVersionName` 一致的版本 tag 后创建 GitHub Release。
 
-当前版本由 `gradle.properties` 唯一管理：`moduleVersionCode=10902`、`moduleVersionName=v1.9.2`。
+当前版本由 `gradle.properties` 唯一管理：`moduleVersionCode=10903`、`moduleVersionName=v1.9.3`。
 
 ## 启用
 

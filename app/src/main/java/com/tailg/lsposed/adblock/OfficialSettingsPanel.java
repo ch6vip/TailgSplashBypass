@@ -382,7 +382,7 @@ final class OfficialSettingsPanel {
         labels.addView(title);
 
         TextView description = new TextView(activity);
-        description.setText("按当前车型打开官方电池信息页");
+        description.setText("选择要打开的官方电池信息页");
         description.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.0f);
         description.setTextColor(palette.onSurfaceVariant);
         description.setLetterSpacing(0.0f);
@@ -411,11 +411,224 @@ final class OfficialSettingsPanel {
         row.addView(arrow, new LinearLayout.LayoutParams(dp(32), dp(48)));
 
         row.setContentDescription("电池信息");
-        row.setOnClickListener(view -> BatteryInfoShortcutController.open(
-                activity,
-                activity.getClassLoader()
-        ));
+        row.setOnClickListener(view -> showBatteryInfoChooser());
         return row;
+    }
+
+    private void showBatteryInfoChooser() {
+        if (activity.isFinishing() || activity.isDestroyed()) {
+            return;
+        }
+
+        Dialog chooser = new Dialog(activity);
+        chooser.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        Window initialWindow = chooser.getWindow();
+        if (initialWindow != null) {
+            initialWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+
+        LinearLayout root = new LinearLayout(activity);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackground(roundedBackground(palette.surface, 8));
+        root.setClipToOutline(true);
+        root.setElevation(dp(12));
+        root.addView(createBatteryChooserHeader(chooser));
+
+        ScrollView choicesScroll = new ScrollView(activity);
+        choicesScroll.setFillViewport(true);
+        choicesScroll.setClipToPadding(false);
+        LinearLayout choices = new LinearLayout(activity);
+        choices.setOrientation(LinearLayout.VERTICAL);
+
+        addBatteryChoice(
+                choices,
+                chooser,
+                "自动选择",
+                "按官方车型规则匹配",
+                null
+        );
+        addBatteryChoice(
+                choices,
+                chooser,
+                "普通电池信息",
+                "车型 1/2 或 GPS 车辆",
+                BatteryInfoRoutePolicy.Route.NORMAL
+        );
+        addBatteryChoice(
+                choices,
+                chooser,
+                "C39 电池信息",
+                "车型 10/14",
+                BatteryInfoRoutePolicy.Route.C39
+        );
+        addBatteryChoice(
+                choices,
+                chooser,
+                "TLV 电池信息",
+                "电池类型 160/208",
+                BatteryInfoRoutePolicy.Route.TLV
+        );
+        addBatteryChoice(
+                choices,
+                chooser,
+                "BMS 电池信息",
+                "电池类型 176",
+                BatteryInfoRoutePolicy.Route.BMS
+        );
+        addBatteryChoice(
+                choices,
+                chooser,
+                "电池动态",
+                "历史电压与温度曲线",
+                BatteryInfoRoutePolicy.Route.DYNAMICS
+        );
+        choicesScroll.addView(choices, new ScrollView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+        root.addView(choicesScroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
+                1.0f
+        ));
+
+        chooser.setContentView(root);
+        chooser.setCanceledOnTouchOutside(true);
+        chooser.show();
+
+        Window window = chooser.getWindow();
+        if (window != null) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams attributes = window.getAttributes();
+            attributes.dimAmount = 0.32f;
+            attributes.gravity = Gravity.CENTER;
+            window.setAttributes(attributes);
+
+            int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
+            int screenHeight = activity.getResources().getDisplayMetrics().heightPixels;
+            int width = Math.min(screenWidth - dp(48), dp(480));
+            int availableHeight = Math.max(screenHeight - dp(48), dp(240));
+            int height = Math.min(availableHeight, dp(440));
+            window.setLayout(Math.max(width, dp(280)), height);
+        }
+    }
+
+    private View createBatteryChooserHeader(Dialog chooser) {
+        LinearLayout bar = new LinearLayout(activity);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(dp(20), dp(12), dp(12), dp(10));
+
+        TextView title = new TextView(activity);
+        title.setText("选择电池信息页面");
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20.0f);
+        title.setTextColor(palette.onSurface);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        title.setLetterSpacing(0.0f);
+        bar.addView(title, new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1.0f
+        ));
+
+        ImageButton close = new ImageButton(activity);
+        close.setImageResource(android.R.drawable.ic_menu_close_clear_cancel);
+        close.setColorFilter(palette.onSurfaceVariant, PorterDuff.Mode.SRC_IN);
+        close.setBackground(iconRippleBackground());
+        close.setContentDescription("关闭");
+        close.setTooltipText("关闭");
+        close.setPadding(dp(10), dp(10), dp(10), dp(10));
+        close.setOnClickListener(view -> chooser.dismiss());
+        bar.addView(close, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        return bar;
+    }
+
+    private void addBatteryChoice(
+            LinearLayout target,
+            Dialog chooser,
+            String title,
+            String description,
+            BatteryInfoRoutePolicy.Route route
+    ) {
+        target.addView(createDivider(dp(16)));
+        target.addView(createBatteryChoiceRow(chooser, title, description, route));
+    }
+
+    private View createBatteryChoiceRow(
+            Dialog chooser,
+            String titleText,
+            String descriptionText,
+            BatteryInfoRoutePolicy.Route route
+    ) {
+        LinearLayout row = new LinearLayout(activity);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setMinimumHeight(dp(64));
+        row.setPadding(dp(16), dp(8), dp(14), dp(8));
+        row.setBackground(rowRippleBackground());
+
+        LinearLayout labels = new LinearLayout(activity);
+        labels.setOrientation(LinearLayout.VERTICAL);
+
+        TextView title = new TextView(activity);
+        title.setText(titleText);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15.0f);
+        title.setTextColor(palette.onSurface);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        title.setLetterSpacing(0.0f);
+        labels.addView(title);
+
+        TextView description = new TextView(activity);
+        description.setText(descriptionText);
+        description.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.0f);
+        description.setTextColor(palette.onSurfaceVariant);
+        description.setLetterSpacing(0.0f);
+        LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        descriptionParams.topMargin = dp(1);
+        labels.addView(description, descriptionParams);
+
+        LinearLayout.LayoutParams labelsParams = new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1.0f
+        );
+        labelsParams.rightMargin = dp(12);
+        row.addView(labels, labelsParams);
+
+        TextView arrow = new TextView(activity);
+        arrow.setText("›");
+        arrow.setTextSize(TypedValue.COMPLEX_UNIT_SP, 27.0f);
+        arrow.setTextColor(palette.onSurfaceVariant);
+        arrow.setGravity(Gravity.CENTER);
+        arrow.setLetterSpacing(0.0f);
+        row.addView(arrow, new LinearLayout.LayoutParams(dp(30), dp(44)));
+
+        row.setContentDescription(titleText);
+        row.setOnClickListener(view -> {
+            boolean opened = route == null
+                    ? BatteryInfoShortcutController.open(activity, activity.getClassLoader())
+                    : BatteryInfoShortcutController.open(
+                            activity,
+                            activity.getClassLoader(),
+                            route
+                    );
+            if (opened) {
+                chooser.dismiss();
+                dismissSettingsPanel();
+            }
+        });
+        return row;
+    }
+
+    private void dismissSettingsPanel() {
+        WeakReference<Dialog> reference = OPEN_DIALOGS.get(activity);
+        Dialog panel = reference == null ? null : reference.get();
+        if (panel != null && panel.isShowing()) {
+            panel.dismiss();
+        }
     }
 
     private View createDistanceRow(boolean unlock) {
