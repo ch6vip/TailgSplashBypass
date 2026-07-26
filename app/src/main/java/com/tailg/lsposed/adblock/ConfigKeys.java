@@ -44,6 +44,79 @@ final class ConfigKeys {
     static final float DEFAULT_PROXIMITY_LOCK_METERS = 3.0f;
     static final boolean DEFAULT_VERBOSE_LOG = false;
 
+    static final String[] BOOLEAN_KEYS = {
+            KEY_ENABLE_MODULE,
+            KEY_STRICT_VERSION_GUARD,
+            KEY_SHOW_OFFICIAL_SETTINGS_ENTRY,
+            KEY_HOOK_SETUP_VIEW,
+            KEY_HOOK_COUNT_DOWN,
+            KEY_HOOK_CONFIG_BEAN,
+            KEY_FORCE_EMPTY_RES,
+            KEY_FORCE_DURATION_ZERO,
+            KEY_FORCE_EMPTY_BANNER,
+            KEY_HOOK_APP_UPDATE,
+            KEY_BLOCK_USAGE_REPORT,
+            KEY_BLOCK_BUGLY,
+            KEY_SIMPLIFY_HOME_NAV,
+            KEY_ENABLE_TRACK_EXPORT,
+            KEY_TRIM_TRACK_ENDPOINTS,
+            KEY_ENABLE_VEHICLE_DIAGNOSTICS,
+            KEY_OVERRIDE_PROXIMITY_DISTANCE,
+            KEY_VERBOSE_LOG
+    };
+
+    static boolean isBooleanKey(String key) {
+        for (String candidate : BOOLEAN_KEYS) {
+            if (candidate.equals(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static boolean defaultBooleanFor(String key) {
+        switch (key) {
+            case KEY_ENABLE_MODULE:
+                return DEFAULT_ENABLE_MODULE;
+            case KEY_STRICT_VERSION_GUARD:
+                return DEFAULT_STRICT_VERSION_GUARD;
+            case KEY_SHOW_OFFICIAL_SETTINGS_ENTRY:
+                return DEFAULT_SHOW_OFFICIAL_SETTINGS_ENTRY;
+            case KEY_HOOK_SETUP_VIEW:
+                return DEFAULT_HOOK_SETUP_VIEW;
+            case KEY_HOOK_COUNT_DOWN:
+                return DEFAULT_HOOK_COUNT_DOWN;
+            case KEY_HOOK_CONFIG_BEAN:
+                return DEFAULT_HOOK_CONFIG_BEAN;
+            case KEY_FORCE_EMPTY_RES:
+                return DEFAULT_FORCE_EMPTY_RES;
+            case KEY_FORCE_DURATION_ZERO:
+                return DEFAULT_FORCE_DURATION_ZERO;
+            case KEY_FORCE_EMPTY_BANNER:
+                return DEFAULT_FORCE_EMPTY_BANNER;
+            case KEY_HOOK_APP_UPDATE:
+                return DEFAULT_HOOK_APP_UPDATE;
+            case KEY_BLOCK_USAGE_REPORT:
+                return DEFAULT_BLOCK_USAGE_REPORT;
+            case KEY_BLOCK_BUGLY:
+                return DEFAULT_BLOCK_BUGLY;
+            case KEY_SIMPLIFY_HOME_NAV:
+                return DEFAULT_SIMPLIFY_HOME_NAV;
+            case KEY_ENABLE_TRACK_EXPORT:
+                return DEFAULT_ENABLE_TRACK_EXPORT;
+            case KEY_TRIM_TRACK_ENDPOINTS:
+                return DEFAULT_TRIM_TRACK_ENDPOINTS;
+            case KEY_ENABLE_VEHICLE_DIAGNOSTICS:
+                return DEFAULT_ENABLE_VEHICLE_DIAGNOSTICS;
+            case KEY_OVERRIDE_PROXIMITY_DISTANCE:
+                return DEFAULT_OVERRIDE_PROXIMITY_DISTANCE;
+            case KEY_VERBOSE_LOG:
+                return DEFAULT_VERBOSE_LOG;
+            default:
+                throw new IllegalArgumentException("Unknown boolean config key: " + key);
+        }
+    }
+
     private ConfigKeys() {
     }
 }

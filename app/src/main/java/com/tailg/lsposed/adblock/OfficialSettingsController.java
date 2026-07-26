@@ -1,18 +1,15 @@
 package com.tailg.lsposed.adblock;
 
 import android.app.Activity;
-import android.content.Intent;
 import android.graphics.drawable.Drawable;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
-import android.widget.Toast;
 
 final class OfficialSettingsController {
     private static final String TAG = "TailgSettingsEntry";
     private static final String MODULE_PACKAGE = "com.tailg.lsposed.adblock";
-    private static final String MODULE_SETTINGS_ACTIVITY = MODULE_PACKAGE + ".MainActivity";
     private static final String ENTRY_TAG = MODULE_PACKAGE + ":official_settings_entry";
     private static final String DIVIDER_TAG = MODULE_PACKAGE + ":official_settings_divider";
     private static final int CONSTRAINT_PARENT_ID = 0;
@@ -198,18 +195,6 @@ final class OfficialSettingsController {
         row.setText("Tailg 工具箱");
         row.setContentDescription("打开 Tailg LSPosed 工具箱");
         row.setVisibility(View.VISIBLE);
-        row.setOnClickListener(view -> openModuleSettings(activity));
-    }
-
-    private static void openModuleSettings(Activity activity) {
-        try {
-            Intent intent = new Intent()
-                    .setClassName(MODULE_PACKAGE, MODULE_SETTINGS_ACTIVITY);
-            activity.startActivity(intent);
-        } catch (RuntimeException error) {
-            Log.w(TAG, "Open module settings failed", error);
-            Toast.makeText(activity, "无法打开 Tailg 工具箱，请确认模块已安装", Toast.LENGTH_SHORT)
-                    .show();
-        }
+        row.setOnClickListener(view -> OfficialSettingsPanel.show(activity));
     }
 }

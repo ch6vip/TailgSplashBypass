@@ -45,7 +45,6 @@ public class TailgAdBlockModule extends XposedModule {
             "com.tailg.run.intelligence.model.mine_setting.activity.SettingActivity";
 
     private final AtomicBoolean initializationScheduled = new AtomicBoolean(false);
-
     @Override
     public void onPackageReady(PackageReadyParam param) {
         if (!TARGET_PACKAGE.equals(param.getPackageName())) {
@@ -480,7 +479,7 @@ public class TailgAdBlockModule extends XposedModule {
             installSettingsEntryHook(
                     onViewCreated,
                     "SettingRevisionFragment#onViewCreated",
-                    chainTarget -> OfficialSettingsController.installRevisionEntry(chainTarget),
+                    OfficialSettingsController::installRevisionEntry,
                     config.verboseLog,
                     report
             );

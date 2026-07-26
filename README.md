@@ -29,7 +29,7 @@
 - 可隐藏“圈子”和“商城”，不删除 Fragment、不修改官方固定下标。
 - 长按首页“爱车”打开只读诊断页，展示车型、在线/设防状态、电量、里程、GPS 时间、能力位和 RSSI 参数。
 - BLE 名称会脱敏；PIN、MAC、IMEI、车架号、SIM、MQTT 凭据、链接码和位置坐标不会显示。
-- 默认在官方 App 的“我的 → 设置”中、账号功能上方显示“Tailg 工具箱”入口，点击后打开模块设置；可在模块总控中关闭该入口。
+- 默认在官方 App 的“我的 → 设置”中、账号功能上方显示“Tailg 工具箱”入口。点击后直接在官方 App 内打开完整配置面板，不切换到模块 App；可在总控中关闭该入口。
 
 ### 感应距离
 
@@ -59,7 +59,7 @@
 - `.github/workflows/android-release-signed.yml`：手动触发签名 release。
 - `.github/workflows/android-release-tag.yml`：推送与 `moduleVersionName` 一致的版本 tag 后创建 GitHub Release。
 
-当前版本由 `gradle.properties` 唯一管理：`moduleVersionCode=10402`、`moduleVersionName=v1.4.2`。
+当前版本由 `gradle.properties` 唯一管理：`moduleVersionCode=10500`、`moduleVersionName=v1.5.0`。
 
 ## 启用
 
