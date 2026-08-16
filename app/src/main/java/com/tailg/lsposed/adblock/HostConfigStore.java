@@ -61,30 +61,7 @@ final class HostConfigStore {
                     ), key);
                 }
             }
-            copyFloatIfPresent(
-                    legacy,
-                    target,
-                    ConfigKeys.KEY_PROXIMITY_UNLOCK_METERS,
-                    ConfigKeys.DEFAULT_PROXIMITY_UNLOCK_METERS
-            );
-            copyFloatIfPresent(
-                    legacy,
-                    target,
-                    ConfigKeys.KEY_PROXIMITY_LOCK_METERS,
-                    ConfigKeys.DEFAULT_PROXIMITY_LOCK_METERS
-            );
             ensureEncoded(target.encode(MIGRATION_MARKER, true), MIGRATION_MARKER);
-        }
-    }
-
-    private static void copyFloatIfPresent(
-            SharedPreferences source,
-            MMKV target,
-            String key,
-            float defaultValue
-    ) {
-        if (source.contains(key)) {
-            ensureEncoded(target.encode(key, source.getFloat(key, defaultValue)), key);
         }
     }
 

@@ -7,10 +7,6 @@ final class HookRequestPlan {
     private final int fastStartupRequestCount;
     private final int repositoryRequestCount;
     private final int homeActivityRequestCount;
-    private final int trackExportRequestCount;
-    private final int hiddenFeatureRequestCount;
-    private final int proximityRequestCount;
-    private final int officialSettingsRequestCount;
 
     private HookRequestPlan(
             int splashRequestCount,
@@ -18,11 +14,7 @@ final class HookRequestPlan {
             int appUpdateRequestCount,
             int fastStartupRequestCount,
             int repositoryRequestCount,
-            int homeActivityRequestCount,
-            int trackExportRequestCount,
-            int hiddenFeatureRequestCount,
-            int proximityRequestCount,
-            int officialSettingsRequestCount
+            int homeActivityRequestCount
     ) {
         this.splashRequestCount = splashRequestCount;
         this.configBeanRequestCount = configBeanRequestCount;
@@ -30,10 +22,6 @@ final class HookRequestPlan {
         this.fastStartupRequestCount = fastStartupRequestCount;
         this.repositoryRequestCount = repositoryRequestCount;
         this.homeActivityRequestCount = homeActivityRequestCount;
-        this.trackExportRequestCount = trackExportRequestCount;
-        this.hiddenFeatureRequestCount = hiddenFeatureRequestCount;
-        this.proximityRequestCount = proximityRequestCount;
-        this.officialSettingsRequestCount = officialSettingsRequestCount;
     }
 
     static HookRequestPlan fromConfig(
@@ -46,18 +34,7 @@ final class HookRequestPlan {
             boolean hookAppUpdate,
             boolean fastStartup,
             boolean blockUsageReport,
-            boolean blockBugly,
-            boolean simplifyHomeNav,
-            boolean swapControlServiceNav,
-            boolean enableVehicleDiagnostics,
-            boolean enableTrackExport,
-            boolean enableMonthlyRideData,
-            boolean showBrakeForceData,
-            boolean showBatteryDynamicsEntry,
-            boolean showCustomVehicleSound,
-            boolean overrideProximityDistance,
-            boolean bleReconnect,
-            boolean showOfficialSettingsEntry
+            boolean blockBugly
     ) {
         int splash = 0;
         if (hookSetupView) {
@@ -88,15 +65,7 @@ final class HookRequestPlan {
 
         int fastStartupHooks = fastStartup ? 5 : 0;
         int repository = blockUsageReport ? 1 : 0;
-        int homeActivity = (blockBugly ? 1 : 0)
-                + (simplifyHomeNav || swapControlServiceNav || enableVehicleDiagnostics ? 1 : 0)
-                + (bleReconnect ? 1 : 0);
-        int trackExport = enableTrackExport ? 1 : 0;
-        int hiddenFeatures = (enableMonthlyRideData ? 2 : 0)
-                + (showBrakeForceData ? 1 : 0)
-                + (showBatteryDynamicsEntry || showCustomVehicleSound ? 1 : 0);
-        int proximity = overrideProximityDistance ? 2 : 0;
-        int officialSettings = showOfficialSettingsEntry ? 2 : 0;
+        int homeActivity = blockBugly ? 1 : 0;
 
         return new HookRequestPlan(
                 splash,
@@ -104,11 +73,7 @@ final class HookRequestPlan {
                 appUpdate,
                 fastStartupHooks,
                 repository,
-                homeActivity,
-                trackExport,
-                hiddenFeatures,
-                proximity,
-                officialSettings
+                homeActivity
         );
     }
 
@@ -136,22 +101,6 @@ final class HookRequestPlan {
         return homeActivityRequestCount > 0;
     }
 
-    boolean hasTrackExportHooks() {
-        return trackExportRequestCount > 0;
-    }
-
-    boolean hasHiddenFeatureHooks() {
-        return hiddenFeatureRequestCount > 0;
-    }
-
-    boolean hasProximityHooks() {
-        return proximityRequestCount > 0;
-    }
-
-    boolean hasOfficialSettingsHooks() {
-        return officialSettingsRequestCount > 0;
-    }
-
     int splashRequestCount() {
         return splashRequestCount;
     }
@@ -176,32 +125,12 @@ final class HookRequestPlan {
         return homeActivityRequestCount;
     }
 
-    int trackExportRequestCount() {
-        return trackExportRequestCount;
-    }
-
-    int hiddenFeatureRequestCount() {
-        return hiddenFeatureRequestCount;
-    }
-
-    int proximityRequestCount() {
-        return proximityRequestCount;
-    }
-
-    int officialSettingsRequestCount() {
-        return officialSettingsRequestCount;
-    }
-
     int totalRequestCount() {
         return splashRequestCount
                 + configBeanRequestCount
                 + appUpdateRequestCount
                 + fastStartupRequestCount
                 + repositoryRequestCount
-                + homeActivityRequestCount
-                + trackExportRequestCount
-                + hiddenFeatureRequestCount
-                + proximityRequestCount
-                + officialSettingsRequestCount;
+                + homeActivityRequestCount;
     }
 }

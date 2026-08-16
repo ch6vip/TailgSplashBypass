@@ -4,7 +4,6 @@ final class ConfigKeys {
     static final String PREFS_NAME = "tailg_adblock";
     static final String KEY_ENABLE_MODULE = "enable_module";
     static final String KEY_STRICT_VERSION_GUARD = "strict_version_guard";
-    static final String KEY_SHOW_OFFICIAL_SETTINGS_ENTRY = "show_official_settings_entry";
     static final String KEY_HOOK_SETUP_VIEW = "hook_setup_view";
     static final String KEY_HOOK_COUNT_DOWN = "hook_count_down";
     static final String KEY_HOOK_CONFIG_BEAN = "hook_config_bean";
@@ -15,26 +14,10 @@ final class ConfigKeys {
     static final String KEY_FAST_STARTUP = "fast_startup";
     static final String KEY_BLOCK_USAGE_REPORT = "block_usage_report";
     static final String KEY_BLOCK_BUGLY = "block_bugly";
-    static final String KEY_SIMPLIFY_HOME_NAV = "simplify_home_nav";
-    static final String KEY_SWAP_CONTROL_SERVICE_NAV = "swap_control_service_nav";
-    static final String KEY_ENABLE_TRACK_EXPORT = "enable_track_export";
-    static final String KEY_TRIM_TRACK_ENDPOINTS = "trim_track_endpoints";
-    static final String KEY_ENABLE_MONTHLY_RIDE_DATA = "enable_monthly_ride_data";
-    static final String KEY_SHOW_BRAKE_FORCE_DATA = "show_brake_force_data";
-    static final String KEY_SHOW_BATTERY_DYNAMICS_ENTRY = "show_battery_dynamics_entry";
-    static final String KEY_SHOW_CUSTOM_VEHICLE_SOUND = "show_custom_vehicle_sound";
-    static final String KEY_ENABLE_VEHICLE_DIAGNOSTICS = "enable_vehicle_diagnostics";
-    static final String KEY_OVERRIDE_PROXIMITY_DISTANCE = "override_proximity_distance";
-    static final String KEY_PROXIMITY_UNLOCK_METERS = "proximity_unlock_meters";
-    static final String KEY_PROXIMITY_LOCK_METERS = "proximity_lock_meters";
-    static final String KEY_BLE_RECONNECT = "ble_reconnect";
-    static final String KEY_BLE_RECONNECT_INTERVAL_SECONDS = "ble_reconnect_interval_seconds";
-    static final String KEY_BLE_RECONNECT_MAX_ATTEMPTS = "ble_reconnect_max_attempts";
     static final String KEY_VERBOSE_LOG = "verbose_log";
 
     static final boolean DEFAULT_ENABLE_MODULE = true;
     static final boolean DEFAULT_STRICT_VERSION_GUARD = true;
-    static final boolean DEFAULT_SHOW_OFFICIAL_SETTINGS_ENTRY = true;
     static final boolean DEFAULT_HOOK_SETUP_VIEW = true;
     static final boolean DEFAULT_HOOK_COUNT_DOWN = true;
     static final boolean DEFAULT_HOOK_CONFIG_BEAN = true;
@@ -45,27 +28,11 @@ final class ConfigKeys {
     static final boolean DEFAULT_FAST_STARTUP = false;
     static final boolean DEFAULT_BLOCK_USAGE_REPORT = true;
     static final boolean DEFAULT_BLOCK_BUGLY = false;
-    static final boolean DEFAULT_SIMPLIFY_HOME_NAV = false;
-    static final boolean DEFAULT_SWAP_CONTROL_SERVICE_NAV = false;
-    static final boolean DEFAULT_ENABLE_TRACK_EXPORT = true;
-    static final boolean DEFAULT_TRIM_TRACK_ENDPOINTS = true;
-    static final boolean DEFAULT_ENABLE_MONTHLY_RIDE_DATA = false;
-    static final boolean DEFAULT_SHOW_BRAKE_FORCE_DATA = false;
-    static final boolean DEFAULT_SHOW_BATTERY_DYNAMICS_ENTRY = false;
-    static final boolean DEFAULT_SHOW_CUSTOM_VEHICLE_SOUND = false;
-    static final boolean DEFAULT_ENABLE_VEHICLE_DIAGNOSTICS = true;
-    static final boolean DEFAULT_OVERRIDE_PROXIMITY_DISTANCE = false;
-    static final float DEFAULT_PROXIMITY_UNLOCK_METERS = 2.0f;
-    static final float DEFAULT_PROXIMITY_LOCK_METERS = 3.0f;
-    static final boolean DEFAULT_BLE_RECONNECT = false;
-    static final int DEFAULT_BLE_RECONNECT_INTERVAL_SECONDS = 15;
-    static final int DEFAULT_BLE_RECONNECT_MAX_ATTEMPTS = 3;
     static final boolean DEFAULT_VERBOSE_LOG = false;
 
     static final String[] BOOLEAN_KEYS = {
             KEY_ENABLE_MODULE,
             KEY_STRICT_VERSION_GUARD,
-            KEY_SHOW_OFFICIAL_SETTINGS_ENTRY,
             KEY_HOOK_SETUP_VIEW,
             KEY_HOOK_COUNT_DOWN,
             KEY_HOOK_CONFIG_BEAN,
@@ -76,17 +43,6 @@ final class ConfigKeys {
             KEY_FAST_STARTUP,
             KEY_BLOCK_USAGE_REPORT,
             KEY_BLOCK_BUGLY,
-            KEY_SIMPLIFY_HOME_NAV,
-            KEY_SWAP_CONTROL_SERVICE_NAV,
-            KEY_ENABLE_TRACK_EXPORT,
-            KEY_TRIM_TRACK_ENDPOINTS,
-            KEY_ENABLE_MONTHLY_RIDE_DATA,
-            KEY_SHOW_BRAKE_FORCE_DATA,
-            KEY_SHOW_BATTERY_DYNAMICS_ENTRY,
-            KEY_SHOW_CUSTOM_VEHICLE_SOUND,
-            KEY_ENABLE_VEHICLE_DIAGNOSTICS,
-            KEY_OVERRIDE_PROXIMITY_DISTANCE,
-            KEY_BLE_RECONNECT,
             KEY_VERBOSE_LOG
     };
 
@@ -105,8 +61,6 @@ final class ConfigKeys {
                 return DEFAULT_ENABLE_MODULE;
             case KEY_STRICT_VERSION_GUARD:
                 return DEFAULT_STRICT_VERSION_GUARD;
-            case KEY_SHOW_OFFICIAL_SETTINGS_ENTRY:
-                return DEFAULT_SHOW_OFFICIAL_SETTINGS_ENTRY;
             case KEY_HOOK_SETUP_VIEW:
                 return DEFAULT_HOOK_SETUP_VIEW;
             case KEY_HOOK_COUNT_DOWN:
@@ -127,28 +81,6 @@ final class ConfigKeys {
                 return DEFAULT_BLOCK_USAGE_REPORT;
             case KEY_BLOCK_BUGLY:
                 return DEFAULT_BLOCK_BUGLY;
-            case KEY_SIMPLIFY_HOME_NAV:
-                return DEFAULT_SIMPLIFY_HOME_NAV;
-            case KEY_SWAP_CONTROL_SERVICE_NAV:
-                return DEFAULT_SWAP_CONTROL_SERVICE_NAV;
-            case KEY_ENABLE_TRACK_EXPORT:
-                return DEFAULT_ENABLE_TRACK_EXPORT;
-            case KEY_TRIM_TRACK_ENDPOINTS:
-                return DEFAULT_TRIM_TRACK_ENDPOINTS;
-            case KEY_ENABLE_MONTHLY_RIDE_DATA:
-                return DEFAULT_ENABLE_MONTHLY_RIDE_DATA;
-            case KEY_SHOW_BRAKE_FORCE_DATA:
-                return DEFAULT_SHOW_BRAKE_FORCE_DATA;
-            case KEY_SHOW_BATTERY_DYNAMICS_ENTRY:
-                return DEFAULT_SHOW_BATTERY_DYNAMICS_ENTRY;
-            case KEY_SHOW_CUSTOM_VEHICLE_SOUND:
-                return DEFAULT_SHOW_CUSTOM_VEHICLE_SOUND;
-            case KEY_ENABLE_VEHICLE_DIAGNOSTICS:
-                return DEFAULT_ENABLE_VEHICLE_DIAGNOSTICS;
-            case KEY_OVERRIDE_PROXIMITY_DISTANCE:
-                return DEFAULT_OVERRIDE_PROXIMITY_DISTANCE;
-            case KEY_BLE_RECONNECT:
-                return DEFAULT_BLE_RECONNECT;
             case KEY_VERBOSE_LOG:
                 return DEFAULT_VERBOSE_LOG;
             default:

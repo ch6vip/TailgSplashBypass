@@ -14,20 +14,14 @@ public class HookRequestPlanTest {
         assertTrue(plan.hasSplashHooks());
         assertTrue(plan.hasConfigBeanHooks());
         assertTrue(plan.hasAppUpdateHooks());
-        assertTrue(plan.hasHiddenFeatureHooks());
         assertEquals(2, plan.splashRequestCount());
         // getIsShow + resources + duration + banners.
         assertEquals(6, plan.configBeanRequestCount());
         assertEquals(2, plan.appUpdateRequestCount());
         assertEquals(5, plan.fastStartupRequestCount());
         assertEquals(1, plan.repositoryRequestCount());
-        assertEquals(3, plan.homeActivityRequestCount());
-        assertEquals(1, plan.trackExportRequestCount());
-        // Monthly entry scope + capability, brake force, and one shared TBox list hook.
-        assertEquals(4, plan.hiddenFeatureRequestCount());
-        assertEquals(2, plan.proximityRequestCount());
-        assertEquals(2, plan.officialSettingsRequestCount());
-        assertEquals(28, plan.totalRequestCount());
+        assertEquals(1, plan.homeActivityRequestCount());
+        assertEquals(17, plan.totalRequestCount());
     }
 
     @Test
@@ -80,30 +74,7 @@ public class HookRequestPlanTest {
         assertFalse(plan.hasSplashHooks());
         assertFalse(plan.hasConfigBeanHooks());
         assertFalse(plan.hasAppUpdateHooks());
-        assertFalse(plan.hasHiddenFeatureHooks());
         assertEquals(0, plan.totalRequestCount());
-    }
-
-    @Test
-    public void officialSettingsEntry_countsRevisionAndLegacyHooks() {
-        Flags flags = new Flags();
-        flags.showOfficialSettingsEntry = true;
-        HookRequestPlan plan = flags.build();
-
-        assertTrue(plan.hasOfficialSettingsHooks());
-        assertEquals(2, plan.officialSettingsRequestCount());
-        assertEquals(2, plan.totalRequestCount());
-    }
-
-    @Test
-    public void swapControlAndService_requestsSharedHomeHook() {
-        Flags flags = new Flags();
-        flags.swapControlServiceNav = true;
-        HookRequestPlan plan = flags.build();
-
-        assertTrue(plan.hasHomeActivityHooks());
-        assertEquals(1, plan.homeActivityRequestCount());
-        assertEquals(1, plan.totalRequestCount());
     }
 
     @Test
@@ -118,9 +89,9 @@ public class HookRequestPlanTest {
     }
 
     @Test
-    public void bleReconnect_requestsHomeResumeHook() {
+    public void buglyBlock_requestsHomeHook() {
         Flags flags = new Flags();
-        flags.bleReconnect = true;
+        flags.blockBugly = true;
         HookRequestPlan plan = flags.build();
 
         assertTrue(plan.hasHomeActivityHooks());
@@ -129,14 +100,13 @@ public class HookRequestPlanTest {
     }
 
     @Test
-    public void batteryAndSound_shareTBoxListHook() {
+    public void usageReportBlock_requestsRepositoryHook() {
         Flags flags = new Flags();
-        flags.showBatteryDynamicsEntry = true;
-        flags.showCustomVehicleSound = true;
+        flags.blockUsageReport = true;
         HookRequestPlan plan = flags.build();
 
-        assertTrue(plan.hasHiddenFeatureHooks());
-        assertEquals(1, plan.hiddenFeatureRequestCount());
+        assertTrue(plan.hasRepositoryHooks());
+        assertEquals(1, plan.repositoryRequestCount());
         assertEquals(1, plan.totalRequestCount());
     }
 
@@ -151,17 +121,6 @@ public class HookRequestPlanTest {
         boolean fastStartup;
         boolean blockUsageReport;
         boolean blockBugly;
-        boolean simplifyHomeNav;
-        boolean swapControlServiceNav;
-        boolean enableVehicleDiagnostics;
-        boolean enableTrackExport;
-        boolean enableMonthlyRideData;
-        boolean showBrakeForceData;
-        boolean showBatteryDynamicsEntry;
-        boolean showCustomVehicleSound;
-        boolean overrideProximityDistance;
-        boolean bleReconnect;
-        boolean showOfficialSettingsEntry;
 
         static Flags allEnabled() {
             Flags flags = new Flags();
@@ -175,17 +134,6 @@ public class HookRequestPlanTest {
             flags.fastStartup = true;
             flags.blockUsageReport = true;
             flags.blockBugly = true;
-            flags.simplifyHomeNav = true;
-            flags.swapControlServiceNav = true;
-            flags.enableVehicleDiagnostics = true;
-            flags.enableTrackExport = true;
-            flags.enableMonthlyRideData = true;
-            flags.showBrakeForceData = true;
-            flags.showBatteryDynamicsEntry = true;
-            flags.showCustomVehicleSound = true;
-            flags.overrideProximityDistance = true;
-            flags.bleReconnect = true;
-            flags.showOfficialSettingsEntry = true;
             return flags;
         }
 
@@ -200,18 +148,7 @@ public class HookRequestPlanTest {
                     hookAppUpdate,
                     fastStartup,
                     blockUsageReport,
-                    blockBugly,
-                    simplifyHomeNav,
-                    swapControlServiceNav,
-                    enableVehicleDiagnostics,
-                    enableTrackExport,
-                    enableMonthlyRideData,
-                    showBrakeForceData,
-                    showBatteryDynamicsEntry,
-                    showCustomVehicleSound,
-                    overrideProximityDistance,
-                    bleReconnect,
-                    showOfficialSettingsEntry
+                    blockBugly
             );
         }
     }

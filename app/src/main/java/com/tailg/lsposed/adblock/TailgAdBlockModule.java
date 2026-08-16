@@ -8,7 +8,6 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
-import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 
@@ -44,22 +43,6 @@ public class TailgAdBlockModule extends XposedModule {
             "com.tailg.run.intelligence.qyapi.QYOptionsUtil";
     private static final String UNICORN = "com.qiyukf.unicorn.api.Unicorn";
     private static final String X5_WEBVIEW = "com.tencent.smtt.sdk.WebView";
-    private static final String TRACK_DETAIL_ACTIVITY =
-            "com.tailg.run.intelligence.model.mine_historical_track.activity.TrackDetailActivity";
-    private static final String HOME_FUNCTION_FRAGMENT =
-            "com.whbluestar.thinkride.ft.home.function.HomeFragment";
-    private static final String DEVICE_FUNCTION = "com.thinkerride.data.DeviceFunction";
-    private static final String AI_RIDING_RECORD_LIST_ACTIVITY =
-            "com.whbluestar.thinkride.ft.record.AIRidingRecordListActivity";
-    private static final String TBOX_SET_ACTIVITY =
-            "com.whbluestar.thinkride.ft.tbox.set.TBoxSetActivity";
-    private static final String CAR_CONTROL_INFO_BEAN =
-            "com.tailg.run.intelligence.model.home.bean.CarControlInfoBean";
-    private static final String SETTING_REVISION_FRAGMENT =
-            "com.tailg.run.intelligence.model.mine_setting.fragment.SettingRevisionFragment";
-    private static final String LEGACY_SETTING_ACTIVITY =
-            "com.tailg.run.intelligence.model.mine_setting.activity.SettingActivity";
-    private static final ThreadLocal<Boolean> MONTHLY_RIDE_ENTRY_SCOPE = new ThreadLocal<>();
 
     private final AtomicBoolean initializationScheduled = new AtomicBoolean(false);
     @Override
@@ -206,18 +189,7 @@ public class TailgAdBlockModule extends XposedModule {
                 config.hookAppUpdate,
                 config.fastStartup,
                 config.blockUsageReport,
-                config.blockBugly,
-                config.simplifyHomeNav,
-                config.swapControlServiceNav,
-                config.enableVehicleDiagnostics,
-                config.enableTrackExport,
-                config.enableMonthlyRideData,
-                config.showBrakeForceData,
-                config.showBatteryDynamicsEntry,
-                config.showCustomVehicleSound,
-                config.overrideProximityDistance,
-                config.bleReconnect,
-                config.showOfficialSettingsEntry
+                config.blockBugly
         );
         HookInstallReport report = new HookInstallReport();
         report.markRequested(requestPlan.totalRequestCount());
@@ -267,33 +239,6 @@ public class TailgAdBlockModule extends XposedModule {
                         classLoader,
                         config,
                         requestPlan.homeActivityRequestCount(),
-                        report
-                );
-            }
-            if (requestPlan.hasTrackExportHooks()) {
-                installTrackExportHooks(
-                        classLoader,
-                        config,
-                        requestPlan.trackExportRequestCount(),
-                        report
-                );
-            }
-            if (requestPlan.hasHiddenFeatureHooks()) {
-                installHiddenFeatureHooks(classLoader, config, report);
-            }
-            if (requestPlan.hasProximityHooks()) {
-                installProximityHooks(
-                        classLoader,
-                        config,
-                        requestPlan.proximityRequestCount(),
-                        report
-                );
-            }
-            if (requestPlan.hasOfficialSettingsHooks()) {
-                installOfficialSettingsHooks(
-                        classLoader,
-                        config,
-                        requestPlan.officialSettingsRequestCount(),
                         report
                 );
             }
@@ -452,72 +397,6 @@ public class TailgAdBlockModule extends XposedModule {
         }
         if (config.blockBugly) {
             installVoidBlockHook(homeClass, "initTencentBugly", config.verboseLog, report);
-        }
-        if (config.bleReconnect) {
-            Method onResume = findNoArgMethod(homeClass, "onResume");
-            if (onResume == null || onResume.getReturnType() != Void.TYPE
-                    || Modifier.isStatic(onResume.getModifiers())) {
-                report.markSkipped();
-            } else {
-                try {
-                    hook(onResume)
-                            .setPriority(PRIORITY_HIGHEST)
-                            .setExceptionMode(ExceptionMode.PROTECTIVE)
-                            .intercept(chain -> {
-                                Object result = chain.proceed();
-                                Object target = chain.getThisObject();
-                                if (target instanceof Activity activity) {
-                                    BleReconnectController.onHomeResumed(
-                                            activity,
-                                            classLoader,
-                                            config.bleReconnectIntervalSeconds,
-                                            config.bleReconnectMaxAttempts,
-                                            config.verboseLog
-                                    );
-                                }
-                                return result;
-                            });
-                    report.markInstalled();
-                } catch (Throwable error) {
-                    report.markFailed();
-                    log(Log.ERROR, TAG, "Install HomeActivity BLE recovery hook failed", error);
-                }
-            }
-        }
-        if (config.simplifyHomeNav
-                || config.swapControlServiceNav
-                || config.enableVehicleDiagnostics) {
-            Method setupFragment = findNoArgMethod(homeClass, "setupFragment");
-            if (setupFragment == null || setupFragment.getReturnType() != Void.TYPE) {
-                report.markSkipped();
-                return;
-            }
-            try {
-                hook(setupFragment)
-                        .setPriority(PRIORITY_HIGHEST)
-                        .setExceptionMode(ExceptionMode.PROTECTIVE)
-                        .intercept(chain -> {
-                            Object result = chain.proceed();
-                            Object target = chain.getThisObject();
-                            if (target instanceof Activity activity) {
-                                HomeEnhancementController.apply(
-                                        activity,
-                                        classLoader,
-                                        config.simplifyHomeNav,
-                                        config.swapControlServiceNav,
-                                        config.enableVehicleDiagnostics,
-                                        config.overrideProximityDistance,
-                                        config.proximityUnlockMeters,
-                                        config.proximityLockMeters
-                                );
-                            }
-                            return result;
-                        });
-                report.markInstalled();
-            } catch (Throwable error) {
-                report.markFailed();
-                log(Log.ERROR, TAG, "Install HomeActivity enhancement hook failed", error);
-            }
         }
     }
 
@@ -684,352 +563,6 @@ public class TailgAdBlockModule extends XposedModule {
         } catch (Throwable error) {
             report.markFailed();
             log(Log.ERROR, TAG, "Install lazy X5 constructor hook failed", error);
-        }
-    }
-
-    private void installTrackExportHooks(
-            ClassLoader classLoader,
-            ModuleConfig config,
-            int requestCount,
-            HookInstallReport report
-    ) {
-        Class<?> trackClass = tryLoadClass(
-                classLoader,
-                TRACK_DETAIL_ACTIVITY,
-                "TrackDetailActivity",
-                requestCount,
-                report
-        );
-        if (trackClass == null) {
-            return;
-        }
-        Method setEventListener = findNoArgMethod(trackClass, "setEventListener");
-        if (setEventListener == null || setEventListener.getReturnType() != Void.TYPE) {
-            report.markSkipped();
-            return;
-        }
-        try {
-            hook(setEventListener)
-                    .setPriority(PRIORITY_HIGHEST)
-                    .setExceptionMode(ExceptionMode.PROTECTIVE)
-                    .intercept(chain -> {
-                        Object result = chain.proceed();
-                        Object target = chain.getThisObject();
-                        if (target instanceof Activity activity) {
-                            TrackExportController.install(
-                                    activity,
-                                    classLoader,
-                                    config.trimTrackEndpoints
-                            );
-                        }
-                        return result;
-                    });
-            report.markInstalled();
-        } catch (Throwable error) {
-            report.markFailed();
-            log(Log.ERROR, TAG, "Install track export hook failed", error);
-        }
-    }
-
-    private void installHiddenFeatureHooks(
-            ClassLoader classLoader,
-            ModuleConfig config,
-            HookInstallReport report
-    ) {
-        if (config.enableMonthlyRideData) {
-            installMonthlyRideDataHooks(classLoader, config.verboseLog, report);
-        }
-        if (config.showBrakeForceData) {
-            installBrakeForceDataHook(classLoader, config.verboseLog, report);
-        }
-        if (config.showBatteryDynamicsEntry || config.showCustomVehicleSound) {
-            installTBoxFeatureEntryHook(classLoader, config, report);
-        }
-    }
-
-    private void installMonthlyRideDataHooks(
-            ClassLoader classLoader,
-            boolean verboseLog,
-            HookInstallReport report
-    ) {
-        Class<?> homeFragment = tryLoadClass(
-                classLoader,
-                HOME_FUNCTION_FRAGMENT,
-                "HomeFragment",
-                1,
-                report
-        );
-        Class<?> deviceFunction = tryLoadClass(
-                classLoader,
-                DEVICE_FUNCTION,
-                "DeviceFunction",
-                1,
-                report
-        );
-        if (homeFragment == null || deviceFunction == null) {
-            if (homeFragment != null || deviceFunction != null) {
-                report.markSkipped();
-            }
-            return;
-        }
-
-        Method openMonthly = findNoArgMethod(homeFragment, "V");
-        Method getMonthAnalysis = findNoArgMethod(deviceFunction, "getMonthAnalysis");
-        boolean openMonthlyValid = openMonthly != null
-                && openMonthly.getReturnType() == Void.TYPE
-                && !Modifier.isStatic(openMonthly.getModifiers());
-        boolean capabilityValid = getMonthAnalysis != null
-                && getMonthAnalysis.getReturnType() == Boolean.TYPE
-                && !Modifier.isStatic(getMonthAnalysis.getModifiers());
-        if (!openMonthlyValid || !capabilityValid) {
-            report.markSkipped();
-            report.markSkipped();
-            return;
-        }
-
-        try {
-            hook(openMonthly)
-                    .setPriority(PRIORITY_HIGHEST)
-                    .setExceptionMode(ExceptionMode.PROTECTIVE)
-                    .intercept(chain -> {
-                        Boolean previous = MONTHLY_RIDE_ENTRY_SCOPE.get();
-                        MONTHLY_RIDE_ENTRY_SCOPE.set(Boolean.TRUE);
-                        try {
-                            return chain.proceed();
-                        } finally {
-                            if (previous == null) {
-                                MONTHLY_RIDE_ENTRY_SCOPE.remove();
-                            } else {
-                                MONTHLY_RIDE_ENTRY_SCOPE.set(previous);
-                            }
-                        }
-                    });
-            report.markInstalled();
-        } catch (Throwable error) {
-            report.markFailed();
-            log(Log.ERROR, TAG, "Install monthly ride entry scope hook failed", error);
-        }
-
-        try {
-            hook(getMonthAnalysis)
-                    .setPriority(PRIORITY_HIGHEST)
-                    .setExceptionMode(ExceptionMode.PROTECTIVE)
-                    .intercept(chain -> Boolean.TRUE.equals(MONTHLY_RIDE_ENTRY_SCOPE.get())
-                            ? Boolean.TRUE
-                            : chain.proceed());
-            report.markInstalled();
-            if (verboseLog) {
-                log(Log.INFO, TAG, "Enabled scoped monthly ride data entry");
-            }
-        } catch (Throwable error) {
-            report.markFailed();
-            log(Log.ERROR, TAG, "Install monthly ride capability hook failed", error);
-        }
-    }
-
-    private void installBrakeForceDataHook(
-            ClassLoader classLoader,
-            boolean verboseLog,
-            HookInstallReport report
-    ) {
-        Class<?> recordList = tryLoadClass(
-                classLoader,
-                AI_RIDING_RECORD_LIST_ACTIVITY,
-                "AIRidingRecordListActivity",
-                1,
-                report
-        );
-        if (recordList == null) {
-            return;
-        }
-        Method loadRecords = findMethod(recordList, "f", boolean.class);
-        if (loadRecords == null || loadRecords.getReturnType() != Void.TYPE
-                || Modifier.isStatic(loadRecords.getModifiers())) {
-            report.markSkipped();
-            return;
-        }
-        try {
-            hook(loadRecords)
-                    .setPriority(PRIORITY_HIGHEST)
-                    .setExceptionMode(ExceptionMode.PROTECTIVE)
-                    .intercept(chain -> {
-                        Object result = chain.proceed();
-                        try {
-                            ReflectionAccess.setField(chain.getThisObject(), "o", true);
-                        } catch (Throwable error) {
-                            log(Log.WARN, TAG, "Set riding-record brake-force flag failed", error);
-                        }
-                        return result;
-                    });
-            report.markInstalled();
-            if (verboseLog) {
-                log(Log.INFO, TAG, "Enabled riding-record brake-force detail flag");
-            }
-        } catch (Throwable error) {
-            report.markFailed();
-            log(Log.ERROR, TAG, "Install brake-force data hook failed", error);
-        }
-    }
-
-    private void installTBoxFeatureEntryHook(
-            ClassLoader classLoader,
-            ModuleConfig config,
-            HookInstallReport report
-    ) {
-        Class<?> tboxSettings = tryLoadClass(
-                classLoader,
-                TBOX_SET_ACTIVITY,
-                "TBoxSetActivity",
-                1,
-                report
-        );
-        if (tboxSettings == null) {
-            return;
-        }
-        Method buildList = findNoArgMethod(tboxSettings, "k");
-        if (buildList == null || buildList.getReturnType() != Void.TYPE
-                || Modifier.isStatic(buildList.getModifiers())) {
-            report.markSkipped();
-            return;
-        }
-        try {
-            hook(buildList)
-                    .setPriority(PRIORITY_HIGHEST)
-                    .setExceptionMode(ExceptionMode.PROTECTIVE)
-                    .intercept(chain -> {
-                        Object result = chain.proceed();
-                        OfficialFeatureEntryController.addTBoxEntries(
-                                chain.getThisObject(),
-                                classLoader,
-                                config.showBatteryDynamicsEntry,
-                                config.showCustomVehicleSound
-                        );
-                        return result;
-                    });
-            report.markInstalled();
-            if (config.verboseLog) {
-                log(Log.INFO, TAG, "Enabled TBox hidden-feature entries");
-            }
-        } catch (Throwable error) {
-            report.markFailed();
-            log(Log.ERROR, TAG, "Install TBox feature-entry hook failed", error);
-        }
-    }
-
-    private void installProximityHooks(
-            ClassLoader classLoader,
-            ModuleConfig config,
-            int requestCount,
-            HookInstallReport report
-    ) {
-        Class<?> beanClass = tryLoadClass(
-                classLoader,
-                CAR_CONTROL_INFO_BEAN,
-                "CarControlInfoBean",
-                requestCount,
-                report
-        );
-        if (beanClass == null) {
-            return;
-        }
-        hookStringMethod(
-                beanClass,
-                "getMinRssiDistance",
-                Float.toString(config.proximityUnlockMeters),
-                config.verboseLog,
-                report
-        );
-        hookStringMethod(
-                beanClass,
-                "getMaxRssiDistance",
-                Float.toString(config.proximityLockMeters),
-                config.verboseLog,
-                report
-        );
-    }
-
-    private void installOfficialSettingsHooks(
-            ClassLoader classLoader,
-            ModuleConfig config,
-            int requestCount,
-            HookInstallReport report
-    ) {
-        int hookCount = requestCount / 2;
-        Class<?> revisionFragment = tryLoadClass(
-                classLoader,
-                SETTING_REVISION_FRAGMENT,
-                "SettingRevisionFragment",
-                hookCount,
-                report
-        );
-        if (revisionFragment != null) {
-            Method onViewCreated = findMethod(
-                    revisionFragment,
-                    "onViewCreated",
-                    View.class,
-                    Bundle.class
-            );
-            installSettingsEntryHook(
-                    onViewCreated,
-                    "SettingRevisionFragment#onViewCreated",
-                    OfficialSettingsController::installRevisionEntry,
-                    config.verboseLog,
-                    report
-            );
-        }
-
-        Class<?> legacyActivity = tryLoadClass(
-                classLoader,
-                LEGACY_SETTING_ACTIVITY,
-                "SettingActivity",
-                requestCount - hookCount,
-                report
-        );
-        if (legacyActivity != null) {
-            Method setEventListener = findNoArgMethod(legacyActivity, "setEventListener");
-            installSettingsEntryHook(
-                    setEventListener,
-                    "SettingActivity#setEventListener",
-                    chainTarget -> {
-                        if (chainTarget instanceof Activity activity) {
-                            OfficialSettingsController.installLegacyEntry(activity);
-                        }
-                    },
-                    config.verboseLog,
-                    report
-            );
-        }
-    }
-
-    private void installSettingsEntryHook(
-            Method method,
-            String methodLabel,
-            SettingsEntryInstaller installer,
-            boolean verboseLog,
-            HookInstallReport report
-    ) {
-        if (method == null || method.getReturnType() != Void.TYPE
-                || Modifier.isStatic(method.getModifiers())) {
-            report.markSkipped();
-            return;
-        }
-        try {
-            hook(method)
-                    .setPriority(PRIORITY_HIGHEST)
-                    .setExceptionMode(ExceptionMode.PROTECTIVE)
-                    .intercept(chain -> {
-                        Object result = chain.proceed();
-                        installer.install(chain.getThisObject());
-                        return result;
-                    });
-            report.markInstalled();
-            if (verboseLog) {
-                log(Log.INFO, TAG, "Hooked official settings entry: " + methodLabel);
-            }
-        } catch (Throwable error) {
-            report.markFailed();
-            log(Log.ERROR, TAG, "Install official settings entry hook failed: "
-                    + methodLabel, error);
         }
     }
 
@@ -1214,28 +747,6 @@ public class TailgAdBlockModule extends XposedModule {
     private ModuleConfig readConfig(SharedPreferences prefs) {
         ModuleConfig defaults = ModuleConfig.defaults();
         try {
-            ProximityPolicy.Distances distances = ProximityPolicy.normalize(
-                    prefs.getFloat(
-                            ConfigKeys.KEY_PROXIMITY_UNLOCK_METERS,
-                            defaults.proximityUnlockMeters
-                    ),
-                    prefs.getFloat(
-                            ConfigKeys.KEY_PROXIMITY_LOCK_METERS,
-                            defaults.proximityLockMeters
-                    )
-            );
-            int reconnectInterval = BleReconnectPolicy.normalizeIntervalSeconds(
-                    prefs.getInt(
-                            ConfigKeys.KEY_BLE_RECONNECT_INTERVAL_SECONDS,
-                            defaults.bleReconnectIntervalSeconds
-                    )
-            );
-            int reconnectAttempts = BleReconnectPolicy.normalizeMaxAttempts(
-                    prefs.getInt(
-                            ConfigKeys.KEY_BLE_RECONNECT_MAX_ATTEMPTS,
-                            defaults.bleReconnectMaxAttempts
-                    )
-            );
             return new ModuleConfig(
                     prefs.getBoolean(ConfigKeys.KEY_ENABLE_MODULE, defaults.enableModule),
                     prefs.getBoolean(ConfigKeys.KEY_STRICT_VERSION_GUARD, defaults.strictVersionGuard),
@@ -1249,46 +760,6 @@ public class TailgAdBlockModule extends XposedModule {
                     prefs.getBoolean(ConfigKeys.KEY_FAST_STARTUP, defaults.fastStartup),
                     prefs.getBoolean(ConfigKeys.KEY_BLOCK_USAGE_REPORT, defaults.blockUsageReport),
                     prefs.getBoolean(ConfigKeys.KEY_BLOCK_BUGLY, defaults.blockBugly),
-                    prefs.getBoolean(ConfigKeys.KEY_SIMPLIFY_HOME_NAV, defaults.simplifyHomeNav),
-                    prefs.getBoolean(
-                            ConfigKeys.KEY_SWAP_CONTROL_SERVICE_NAV,
-                            defaults.swapControlServiceNav
-                    ),
-                    prefs.getBoolean(ConfigKeys.KEY_ENABLE_TRACK_EXPORT, defaults.enableTrackExport),
-                    prefs.getBoolean(ConfigKeys.KEY_TRIM_TRACK_ENDPOINTS, defaults.trimTrackEndpoints),
-                    prefs.getBoolean(
-                            ConfigKeys.KEY_ENABLE_MONTHLY_RIDE_DATA,
-                            defaults.enableMonthlyRideData
-                    ),
-                    prefs.getBoolean(
-                            ConfigKeys.KEY_SHOW_BRAKE_FORCE_DATA,
-                            defaults.showBrakeForceData
-                    ),
-                    prefs.getBoolean(
-                            ConfigKeys.KEY_SHOW_BATTERY_DYNAMICS_ENTRY,
-                            defaults.showBatteryDynamicsEntry
-                    ),
-                    prefs.getBoolean(
-                            ConfigKeys.KEY_SHOW_CUSTOM_VEHICLE_SOUND,
-                            defaults.showCustomVehicleSound
-                    ),
-                    prefs.getBoolean(
-                            ConfigKeys.KEY_ENABLE_VEHICLE_DIAGNOSTICS,
-                            defaults.enableVehicleDiagnostics
-                    ),
-                    prefs.getBoolean(
-                            ConfigKeys.KEY_OVERRIDE_PROXIMITY_DISTANCE,
-                            defaults.overrideProximityDistance
-                    ),
-                    prefs.getBoolean(
-                            ConfigKeys.KEY_SHOW_OFFICIAL_SETTINGS_ENTRY,
-                            defaults.showOfficialSettingsEntry
-                    ),
-                    prefs.getBoolean(ConfigKeys.KEY_BLE_RECONNECT, defaults.bleReconnect),
-                    reconnectInterval,
-                    reconnectAttempts,
-                    distances.unlockMeters,
-                    distances.lockMeters,
                     prefs.getBoolean(ConfigKeys.KEY_VERBOSE_LOG, defaults.verboseLog)
             );
         } catch (Throwable t) {
@@ -1349,22 +820,6 @@ public class TailgAdBlockModule extends XposedModule {
         final boolean fastStartup;
         final boolean blockUsageReport;
         final boolean blockBugly;
-        final boolean simplifyHomeNav;
-        final boolean swapControlServiceNav;
-        final boolean enableTrackExport;
-        final boolean trimTrackEndpoints;
-        final boolean enableMonthlyRideData;
-        final boolean showBrakeForceData;
-        final boolean showBatteryDynamicsEntry;
-        final boolean showCustomVehicleSound;
-        final boolean enableVehicleDiagnostics;
-        final boolean overrideProximityDistance;
-        final boolean showOfficialSettingsEntry;
-        final boolean bleReconnect;
-        final int bleReconnectIntervalSeconds;
-        final int bleReconnectMaxAttempts;
-        final float proximityUnlockMeters;
-        final float proximityLockMeters;
         final boolean verboseLog;
 
         ModuleConfig(
@@ -1380,22 +835,6 @@ public class TailgAdBlockModule extends XposedModule {
                 boolean fastStartup,
                 boolean blockUsageReport,
                 boolean blockBugly,
-                boolean simplifyHomeNav,
-                boolean swapControlServiceNav,
-                boolean enableTrackExport,
-                boolean trimTrackEndpoints,
-                boolean enableMonthlyRideData,
-                boolean showBrakeForceData,
-                boolean showBatteryDynamicsEntry,
-                boolean showCustomVehicleSound,
-                boolean enableVehicleDiagnostics,
-                boolean overrideProximityDistance,
-                boolean showOfficialSettingsEntry,
-                boolean bleReconnect,
-                int bleReconnectIntervalSeconds,
-                int bleReconnectMaxAttempts,
-                float proximityUnlockMeters,
-                float proximityLockMeters,
                 boolean verboseLog
         ) {
             this.enableModule = enableModule;
@@ -1410,22 +849,6 @@ public class TailgAdBlockModule extends XposedModule {
             this.fastStartup = fastStartup;
             this.blockUsageReport = blockUsageReport;
             this.blockBugly = blockBugly;
-            this.simplifyHomeNav = simplifyHomeNav;
-            this.swapControlServiceNav = swapControlServiceNav;
-            this.enableTrackExport = enableTrackExport;
-            this.trimTrackEndpoints = trimTrackEndpoints;
-            this.enableMonthlyRideData = enableMonthlyRideData;
-            this.showBrakeForceData = showBrakeForceData;
-            this.showBatteryDynamicsEntry = showBatteryDynamicsEntry;
-            this.showCustomVehicleSound = showCustomVehicleSound;
-            this.enableVehicleDiagnostics = enableVehicleDiagnostics;
-            this.overrideProximityDistance = overrideProximityDistance;
-            this.showOfficialSettingsEntry = showOfficialSettingsEntry;
-            this.bleReconnect = bleReconnect;
-            this.bleReconnectIntervalSeconds = bleReconnectIntervalSeconds;
-            this.bleReconnectMaxAttempts = bleReconnectMaxAttempts;
-            this.proximityUnlockMeters = proximityUnlockMeters;
-            this.proximityLockMeters = proximityLockMeters;
             this.verboseLog = verboseLog;
         }
 
@@ -1443,30 +866,9 @@ public class TailgAdBlockModule extends XposedModule {
                     ConfigKeys.DEFAULT_FAST_STARTUP,
                     ConfigKeys.DEFAULT_BLOCK_USAGE_REPORT,
                     ConfigKeys.DEFAULT_BLOCK_BUGLY,
-                    ConfigKeys.DEFAULT_SIMPLIFY_HOME_NAV,
-                    ConfigKeys.DEFAULT_SWAP_CONTROL_SERVICE_NAV,
-                    ConfigKeys.DEFAULT_ENABLE_TRACK_EXPORT,
-                    ConfigKeys.DEFAULT_TRIM_TRACK_ENDPOINTS,
-                    ConfigKeys.DEFAULT_ENABLE_MONTHLY_RIDE_DATA,
-                    ConfigKeys.DEFAULT_SHOW_BRAKE_FORCE_DATA,
-                    ConfigKeys.DEFAULT_SHOW_BATTERY_DYNAMICS_ENTRY,
-                    ConfigKeys.DEFAULT_SHOW_CUSTOM_VEHICLE_SOUND,
-                    ConfigKeys.DEFAULT_ENABLE_VEHICLE_DIAGNOSTICS,
-                    ConfigKeys.DEFAULT_OVERRIDE_PROXIMITY_DISTANCE,
-                    ConfigKeys.DEFAULT_SHOW_OFFICIAL_SETTINGS_ENTRY,
-                    ConfigKeys.DEFAULT_BLE_RECONNECT,
-                    ConfigKeys.DEFAULT_BLE_RECONNECT_INTERVAL_SECONDS,
-                    ConfigKeys.DEFAULT_BLE_RECONNECT_MAX_ATTEMPTS,
-                    ConfigKeys.DEFAULT_PROXIMITY_UNLOCK_METERS,
-                    ConfigKeys.DEFAULT_PROXIMITY_LOCK_METERS,
                     ConfigKeys.DEFAULT_VERBOSE_LOG
             );
         }
-    }
-
-    @FunctionalInterface
-    private interface SettingsEntryInstaller {
-        void install(Object target);
     }
 
     private static final class VersionInfo {
